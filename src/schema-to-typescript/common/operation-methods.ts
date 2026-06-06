@@ -2,7 +2,7 @@ import { arrowFunctionExpression, assignmentPattern, blockStatement, callExpress
 import type { ClassProperty, Expression, Identifier, TSType } from '../../emit/index.ts';
 import ts from 'typescript';
 import {uniq} from '../../utils/collections.ts';
-import {generateBinaryType} from './binary.ts';
+import {createBinaryTypeGetter} from './binary.ts';
 import type { GetModelData } from './models.ts';
 import {getOperationReturnType} from './operation-return.ts';
 import type { OpenApiParameter, OpenApiSchema } from '../../schemas/common.ts';
@@ -10,6 +10,7 @@ import { openApiHttpMethods } from '../../schemas/openapi.ts';
 import type { OpenApiMediaType, OpenApiOperation, OpenApiPathItem, OpenApiPaths, OpenApiRequestBody } from '../../schemas/openapi.ts';
 import { extendDependenciesAndGetResult, extendDependencyImports, generateSchemaTypeAndImports } from '../../utils/dependencies.ts';
 import type { DependencyImports } from '../../utils/dependencies.ts';
+import { resolveJsDocWithHook, resolveWithHook, renderJsDocWithHook } from '../../utils/hooks.ts';
 import { attachJsDocComment, extractJsDoc, renderJsDoc } from '../../utils/jsdoc.ts';
 import type { JsDocRenderConfig } from '../../utils/jsdoc.ts';
 import {isJsonMediaType, isWildcardMediaType} from '../../utils/media-types.ts';
@@ -72,19 +73,8 @@ type OperationInputParameterLocation = Exclude<OpenApiParameter['in'], 'cookie'>
 type OperationInputParameters = {
     [K in OperationInputParameterLocation]: (OpenApiParameterFromArgument | OpenApiParameterValue)[];
 };
-type GenerateOperationParameterArgumentName = NonNullable<
-    OpenApiClientGeneratorConfig['operations']
->['generateOperationParameterArgumentName'];
-type GenerateOperationParameterJsDoc = NonNullable<
-    OpenApiClientGeneratorConfig['operations']
->['generateOperationParameterJsDoc'];
-type GenerateOperationRequestBodyArgumentName = NonNullable<
-    OpenApiClientGeneratorConfig['operations']
->['generateOperationRequestBodyArgumentName'];
-type GenerateOperationRequestBodyJsDoc = NonNullable<
-    OpenApiClientGeneratorConfig['operations']
->['generateOperationRequestBodyJsDoc'];
-type MediaTypeArgumentName = NonNullable<OpenApiClientGeneratorConfig['operations']>['mediaTypeArgumentName'];
+
+type OperationsConfig = OpenApiClientGeneratorConfig['operations'];
 
 interface OperationMethodContext {
     operation: OpenApiOperation;
@@ -102,11 +92,17 @@ interface SchemaTypeContext {
     dependencyImports: DependencyImports;
 }
 
-interface JsDocContext {
+interface OperationMethodSchemaContext extends OperationMethodContext, SchemaTypeContext {
     jsDocRenderConfig: JsDocRenderConfig;
 }
 
-type OperationMethodSchemaContext = OperationMethodContext & SchemaTypeContext & JsDocContext;
+interface OperationMethodHooks {
+    generateOperationParameterArgumentName?: NonNullable<OperationsConfig>['generateOperationParameterArgumentName'];
+    generateOperationParameterJsDoc?: NonNullable<OperationsConfig>['generateOperationParameterJsDoc'];
+    generateOperationRequestBodyArgumentName?: NonNullable<OperationsConfig>['generateOperationRequestBodyArgumentName'];
+    generateOperationRequestBodyJsDoc?: NonNullable<OperationsConfig>['generateOperationRequestBodyJsDoc'];
+    mediaTypeArgumentName?: NonNullable<OperationsConfig>['mediaTypeArgumentName'];
+}
 
 function createOperationInputParameters(): OperationInputParameters {
     return {
@@ -117,15 +113,15 @@ function createOperationInputParameters(): OperationInputParameters {
     };
 }
 
-function generateSchemaType(schema: OpenApiSchema | boolean, context: SchemaTypeContext) {
+function generateSchemaType(schema: OpenApiSchema | boolean, ctx: SchemaTypeContext) {
     return extendDependenciesAndGetResult(
         generateSchemaTypeAndImports({
             schema,
-            sourceImportPath: context.operationImportPath,
-            getModelData: context.getModelData,
-            getBinaryType: context.getBinaryType
+            sourceImportPath: ctx.operationImportPath,
+            getModelData: ctx.getModelData,
+            getBinaryType: ctx.getBinaryType
         }),
-        context.dependencyImports
+        ctx.dependencyImports
     );
 }
 
@@ -200,30 +196,14 @@ function validateOperationParameter(
     throw new Error(`Unknown parameter type ${parameter.in}: ${getParameterErrorLocation(parameter, path, httpMethod)}`);
 }
 
-function addOperationParameterInput({
-    inputParameters,
-    parameter,
-    operation,
-    pathItem,
-    path,
-    serviceName,
-    httpMethod,
-    operationName,
-    usedInputNames,
-    getModelData,
-    operationImportPath,
-    getBinaryType,
-    dependencyImports,
-    jsDocRenderConfig,
-    generateOperationParameterArgumentName,
-    generateOperationParameterJsDoc
-}: {
-    inputParameters: OperationInputParameters;
-    parameter: OpenApiParameter;
-    usedInputNames: Record<string, true>;
-    generateOperationParameterArgumentName?: GenerateOperationParameterArgumentName;
-    generateOperationParameterJsDoc?: GenerateOperationParameterJsDoc;
-} & OperationMethodSchemaContext) {
+function addOperationParameterInput(
+    ctx: OperationMethodSchemaContext,
+    hooks: Pick<OperationMethodHooks, 'generateOperationParameterArgumentName' | 'generateOperationParameterJsDoc'>,
+    inputParameters: OperationInputParameters,
+    parameter: OpenApiParameter,
+    usedInputNames: Record<string, true>
+) {
+    const {path, httpMethod} = ctx;
     validateOperationParameter(parameter, path, httpMethod);
 
     const schema = parameter.schema ?? true;
@@ -241,23 +221,15 @@ function addOperationParameterInput({
         usedInputNames
     );
     const parameterName = generateUniqueName(
-        generateOperationParameterArgumentName
-            ? generateOperationParameterArgumentName({
-                  operation,
-                  path,
-                  serviceName,
-                  parameter,
-                  pathItem,
-                  operationName,
-                  suggestedName: suggestedParameterName,
-                  httpMethod
-              })
-            : suggestedParameterName,
+        resolveWithHook(suggestedParameterName, hooks.generateOperationParameterArgumentName, {
+            ...ctx,
+            parameter,
+            suggestedName: suggestedParameterName
+        }),
         [],
         usedInputNames
     );
     usedInputNames[parameterName] = true;
-    const paramJsDoc = extractJsDoc(parameter);
     inputParameters[parameter.in].push({
         paramName: parameter.name,
         argumentName: parameterName,
@@ -267,21 +239,12 @@ function addOperationParameterInput({
             usedInputNames
         ),
         optional: !parameter.required,
-        type: generateSchemaType(schema, {getModelData, operationImportPath, getBinaryType, dependencyImports}),
-        docs: renderJsDoc(
-            generateOperationParameterJsDoc
-                ? generateOperationParameterJsDoc({
-                      suggestedJsDoc: paramJsDoc,
-                      operation,
-                      operationName,
-                      serviceName,
-                      parameter,
-                      pathItem,
-                      path,
-                      httpMethod
-                  })
-                : paramJsDoc,
-            jsDocRenderConfig
+        type: generateSchemaType(schema, ctx),
+        docs: renderJsDocWithHook(
+            extractJsDoc(parameter),
+            hooks.generateOperationParameterJsDoc,
+            {...ctx, parameter},
+            ctx.jsDocRenderConfig
         )
     });
 }
@@ -298,34 +261,16 @@ function getRequestBodyMediaTypes(requestBody: OpenApiRequestBody) {
     return mediaTypes;
 }
 
-function addMultiMediaTypeRequestBodyInputs({
-    inputParameters,
-    mediaTypesWithRequestBodyNames,
-    allRequestBodyNames,
-    mediaTypeName,
-    requestBody,
-    operation,
-    pathItem,
-    path,
-    serviceName,
-    httpMethod,
-    operationName,
-    usedInputNames,
-    getModelData,
-    operationImportPath,
-    getBinaryType,
-    dependencyImports,
-    jsDocRenderConfig,
-    generateOperationRequestBodyJsDoc
-}: {
-    inputParameters: OperationInputParameters;
-    mediaTypesWithRequestBodyNames: {mediaType: string; content: OpenApiMediaType; requestBodyName: string}[];
-    allRequestBodyNames: string[];
-    mediaTypeName: string;
-    requestBody: OpenApiRequestBody;
-    usedInputNames: Record<string, true>;
-    generateOperationRequestBodyJsDoc?: GenerateOperationRequestBodyJsDoc;
-} & OperationMethodSchemaContext) {
+function addMultiMediaTypeRequestBodyInputs(
+    ctx: OperationMethodSchemaContext,
+    hooks: Pick<OperationMethodHooks, 'generateOperationRequestBodyJsDoc'>,
+    inputParameters: OperationInputParameters,
+    mediaTypesWithRequestBodyNames: {mediaType: string; content: OpenApiMediaType; requestBodyName: string}[],
+    allRequestBodyNames: string[],
+    mediaTypeName: string,
+    requestBody: OpenApiRequestBody,
+    usedInputNames: Record<string, true>
+) {
     const additionUnion = tsUnionType([]);
     let defaultMediaType: string | undefined;
     for (const {mediaType, content, requestBodyName} of mediaTypesWithRequestBodyNames) {
@@ -353,32 +298,14 @@ function addMultiMediaTypeRequestBodyInputs({
                         tsPropertySignature(
                             identifier(requestBodyName),
                             tsTypeAnnotation(
-                                isCurrentRequestBody
-                                    ? generateSchemaType(schema, {
-                                          getModelData,
-                                          operationImportPath,
-                                          getBinaryType,
-                                          dependencyImports
-                                      })
-                                    : tsUndefinedKeyword()
+                                isCurrentRequestBody ? generateSchemaType(schema, ctx) : tsUndefinedKeyword()
                             )
                         ),
-                        renderJsDoc(
-                            generateOperationRequestBodyJsDoc
-                                ? generateOperationRequestBodyJsDoc({
-                                      suggestedJsDoc: jsdoc,
-                                      serviceName,
-                                      operation,
-                                      pathItem,
-                                      operationName,
-                                      content,
-                                      requestBody,
-                                      path,
-                                      mediaType,
-                                      httpMethod
-                                  })
-                                : jsdoc,
-                            jsDocRenderConfig
+                        renderJsDocWithHook(
+                            jsdoc,
+                            hooks.generateOperationRequestBodyJsDoc,
+                            {...ctx, content, requestBody, mediaType},
+                            ctx.jsDocRenderConfig
                         )
                     );
                     return tsPropertySignature(property.name, tsTypeAnnotation(property.type!), !isCurrentRequestBody);
@@ -404,36 +331,17 @@ function addMultiMediaTypeRequestBodyInputs({
     return additionUnion;
 }
 
-function addSingleMediaTypeRequestBodyInputs({
-    inputParameters,
-    mediaType,
-    content,
-    requestBodyName,
-    mediaTypeName,
-    requestBody,
-    operation,
-    pathItem,
-    path,
-    serviceName,
-    httpMethod,
-    operationName,
-    usedInputNames,
-    getModelData,
-    operationImportPath,
-    getBinaryType,
-    dependencyImports,
-    jsDocRenderConfig,
-    generateOperationRequestBodyJsDoc
-}: {
-    inputParameters: OperationInputParameters;
-    mediaType: string;
-    content: OpenApiMediaType;
-    requestBodyName: string;
-    mediaTypeName: string;
-    requestBody: OpenApiRequestBody;
-    usedInputNames: Record<string, true>;
-    generateOperationRequestBodyJsDoc?: GenerateOperationRequestBodyJsDoc;
-} & OperationMethodSchemaContext) {
+function addSingleMediaTypeRequestBodyInputs(
+    ctx: OperationMethodSchemaContext,
+    hooks: Pick<OperationMethodHooks, 'generateOperationRequestBodyJsDoc'>,
+    inputParameters: OperationInputParameters,
+    mediaType: string,
+    content: OpenApiMediaType,
+    requestBodyName: string,
+    mediaTypeName: string,
+    requestBody: OpenApiRequestBody,
+    usedInputNames: Record<string, true>
+) {
     const schema = content.schema ?? true;
     const jsdoc = extractJsDoc({...requestBody, ...content});
     if (mediaType.includes('*')) {
@@ -454,56 +362,29 @@ function addSingleMediaTypeRequestBodyInputs({
         paramName: requestBodyName,
         argumentName: requestBodyName,
         destructuringName: generateDestructuringName(requestBodyName, [], usedInputNames),
-        type: generateSchemaType(schema, {getModelData, operationImportPath, getBinaryType, dependencyImports}),
-        docs: renderJsDoc(
-            generateOperationRequestBodyJsDoc
-                ? generateOperationRequestBodyJsDoc({
-                      suggestedJsDoc: jsdoc,
-                      serviceName,
-                      operation,
-                      pathItem,
-                      operationName,
-                      content,
-                      requestBody,
-                      path,
-                      mediaType,
-                      httpMethod
-                  })
-                : jsdoc,
-            jsDocRenderConfig
+        type: generateSchemaType(schema, ctx),
+        docs: renderJsDocWithHook(
+            jsdoc,
+            hooks.generateOperationRequestBodyJsDoc,
+            {...ctx, content, requestBody, mediaType},
+            ctx.jsDocRenderConfig
         )
     });
 }
 
-function addRequestBodyInputs({
-    inputParameters,
-    requestBody,
-    operation,
-    pathItem,
-    path,
-    serviceName,
-    httpMethod,
-    operationName,
-    usedInputNames,
-    getModelData,
-    operationImportPath,
-    getBinaryType,
-    dependencyImports,
-    jsDocRenderConfig,
-    generateOperationRequestBodyArgumentName,
-    mediaTypeArgumentName,
-    generateOperationRequestBodyJsDoc
-}: {
-    inputParameters: OperationInputParameters;
-    requestBody: OpenApiRequestBody;
-    usedInputNames: Record<string, true>;
-    generateOperationRequestBodyArgumentName?: GenerateOperationRequestBodyArgumentName;
-    mediaTypeArgumentName?: MediaTypeArgumentName;
-    generateOperationRequestBodyJsDoc?: GenerateOperationRequestBodyJsDoc;
-} & OperationMethodSchemaContext): {requestBodyArgumentNames: string[]; argumentExtensionType?: TSType} {
+function addRequestBodyInputs(
+    ctx: OperationMethodSchemaContext,
+    hooks: Pick<
+        OperationMethodHooks,
+        'generateOperationRequestBodyArgumentName' | 'generateOperationRequestBodyJsDoc' | 'mediaTypeArgumentName'
+    >,
+    inputParameters: OperationInputParameters,
+    requestBody: OpenApiRequestBody,
+    usedInputNames: Record<string, true>
+): {requestBodyArgumentNames: string[]; argumentExtensionType?: TSType} {
     inputParameters['body'] = [];
     const mediaTypes = getRequestBodyMediaTypes(requestBody);
-    const mediaTypeName = generateUniqueName(mediaTypeArgumentName ?? 'mediaType', [], usedInputNames);
+    const mediaTypeName = generateUniqueName(hooks.mediaTypeArgumentName ?? 'mediaType', [], usedInputNames);
     usedInputNames[mediaTypeName] = true;
     const mediaTypesWithRequestBodyNames = mediaTypes.map(([mediaType, content]) => {
         const requestBodySuggestedName = generateUniqueName(
@@ -515,20 +396,13 @@ function addRequestBodyInputs({
             mediaType,
             content,
             requestBodyName: generateUniqueName(
-                generateOperationRequestBodyArgumentName
-                    ? generateOperationRequestBodyArgumentName({
-                          path,
-                          pathItem,
-                          operation,
-                          operationName,
-                          serviceName,
-                          content,
-                          requestBody,
-                          mediaType,
-                          suggestedName: requestBodySuggestedName,
-                          httpMethod
-                      })
-                    : requestBodySuggestedName,
+                resolveWithHook(requestBodySuggestedName, hooks.generateOperationRequestBodyArgumentName, {
+                    ...ctx,
+                    content,
+                    requestBody,
+                    mediaType,
+                    suggestedName: requestBodySuggestedName
+                }),
                 [],
                 usedInputNames
             )
@@ -541,51 +415,31 @@ function addRequestBodyInputs({
     if (mediaTypesWithRequestBodyNames.length > 1) {
         return {
             requestBodyArgumentNames,
-            argumentExtensionType: addMultiMediaTypeRequestBodyInputs({
+            argumentExtensionType: addMultiMediaTypeRequestBodyInputs(
+                ctx,
+                hooks,
                 inputParameters,
                 mediaTypesWithRequestBodyNames,
-                allRequestBodyNames: requestBodyArgumentNames,
+                requestBodyArgumentNames,
                 mediaTypeName,
                 requestBody,
-                operation,
-                pathItem,
-                path,
-                serviceName,
-                httpMethod,
-                operationName,
-                usedInputNames,
-                getModelData,
-                operationImportPath,
-                getBinaryType,
-                dependencyImports,
-                jsDocRenderConfig,
-                generateOperationRequestBodyJsDoc
-            })
+                usedInputNames
+            )
         };
     }
     if (mediaTypesWithRequestBodyNames.length === 1) {
         const [{mediaType, content, requestBodyName}] = mediaTypesWithRequestBodyNames;
-        addSingleMediaTypeRequestBodyInputs({
+        addSingleMediaTypeRequestBodyInputs(
+            ctx,
+            hooks,
             inputParameters,
             mediaType,
             content,
             requestBodyName,
             mediaTypeName,
             requestBody,
-            operation,
-            pathItem,
-            path,
-            serviceName,
-            httpMethod,
-            operationName,
-            usedInputNames,
-            getModelData,
-            operationImportPath,
-            getBinaryType,
-            dependencyImports,
-            jsDocRenderConfig,
-            generateOperationRequestBodyJsDoc
-        });
+            usedInputNames
+        );
     }
     return {requestBodyArgumentNames};
 }
@@ -620,8 +474,15 @@ export function generateOperationMethods({
     jsDocRenderConfig: JsDocRenderConfig;
 }) {
     const dependencyImports: DependencyImports = {};
-    const getBinaryType = () =>
-        extendDependenciesAndGetResult(generateBinaryType(binaryTypes, operationImportPath), dependencyImports);
+    const getBinaryType = createBinaryTypeGetter(binaryTypes, operationImportPath, dependencyImports);
+    const parameterHooks: Pick<
+        OperationMethodHooks,
+        'generateOperationParameterArgumentName' | 'generateOperationParameterJsDoc'
+    > = {generateOperationParameterArgumentName, generateOperationParameterJsDoc};
+    const requestBodyHooks: Pick<
+        OperationMethodHooks,
+        'generateOperationRequestBodyArgumentName' | 'generateOperationRequestBodyJsDoc' | 'mediaTypeArgumentName'
+    > = {generateOperationRequestBodyArgumentName, generateOperationRequestBodyJsDoc, mediaTypeArgumentName};
 
     const methodProperties: ClassProperty[] = [];
     const deprecatedOperations: {[methodAndPath: string]: string} = {};
@@ -636,16 +497,14 @@ export function generateOperationMethods({
                 operation.operationId ?? `${httpMethod}:${path}`,
                 'camelCase'
             );
-            const operationName = generateOperationName
-                ? generateOperationName({
-                      suggestedName: suggestedOperationMethodName,
-                      operation,
-                      pathItem,
-                      path,
-                      serviceName,
-                      httpMethod
-                  })
-                : suggestedOperationMethodName;
+            const operationName = resolveWithHook(suggestedOperationMethodName, generateOperationName, {
+                suggestedName: suggestedOperationMethodName,
+                operation,
+                pathItem,
+                path,
+                serviceName,
+                httpMethod
+            });
             if (operation.deprecated) {
                 deprecatedOperations[`${httpMethod.toUpperCase()} ${path}`] = operationName;
             }
@@ -659,52 +518,43 @@ export function generateOperationMethods({
             const parameters = sortParameters(operation.parameters ?? []);
             const usedInputNames: Record<string, true> = {};
             const inputParameters = createOperationInputParameters();
+            const ctx: OperationMethodSchemaContext = {
+                operation,
+                pathItem,
+                path,
+                serviceName,
+                httpMethod,
+                operationName,
+                getModelData,
+                operationImportPath,
+                getBinaryType,
+                dependencyImports,
+                jsDocRenderConfig
+            };
             for (const parameter of parameters) {
-                addOperationParameterInput({
-                    inputParameters,
-                    parameter,
-                    operation,
-                    pathItem,
-                    path,
-                    serviceName,
-                    httpMethod,
-                    operationName,
-                    usedInputNames,
-                    getModelData,
-                    operationImportPath,
-                    getBinaryType,
-                    dependencyImports,
-                    jsDocRenderConfig,
-                    generateOperationParameterArgumentName,
-                    generateOperationParameterJsDoc
-                });
+                addOperationParameterInput(ctx, parameterHooks, inputParameters, parameter, usedInputNames);
             }
             let jsdoc = extractJsDoc(operation);
             if (operationReturn.suggestedDescription || generateOperationResultDescription) {
                 jsdoc.tags.push({
                     name: 'returns',
-                    value: generateOperationResultDescription
-                        ? generateOperationResultDescription({
-                              serviceName,
-                              suggestedDescription: operationReturn.suggestedDescription,
-                              operation,
-                              pathItem,
-                              path,
-                              httpMethod
-                          })
-                        : operationReturn.suggestedDescription
+                    value: resolveWithHook(operationReturn.suggestedDescription, generateOperationResultDescription, {
+                        serviceName,
+                        suggestedDescription: operationReturn.suggestedDescription,
+                        operation,
+                        pathItem,
+                        path,
+                        httpMethod
+                    })
                 });
             }
-            if (generateOperationJsDoc) {
-                jsdoc = generateOperationJsDoc({
-                    suggestedJsDoc: jsdoc,
-                    serviceName,
-                    httpMethod,
-                    pathItem,
-                    path,
-                    operation
-                });
-            }
+            jsdoc = resolveJsDocWithHook(jsdoc, generateOperationJsDoc, {
+                serviceName,
+                httpMethod,
+                pathItem,
+                path,
+                operation
+            });
 
             const requestObject = objectExpression([
                 objectProperty(identifier('path'), stringLiteral(path)),
@@ -715,25 +565,13 @@ export function generateOperationMethods({
             let argumentExtensionType: TSType | undefined;
             const requestBody = operation.requestBody;
             if (requestBody) {
-                const requestBodyInputs = addRequestBodyInputs({
+                const requestBodyInputs = addRequestBodyInputs(
+                    ctx,
+                    requestBodyHooks,
                     inputParameters,
                     requestBody,
-                    operation,
-                    pathItem,
-                    path,
-                    serviceName,
-                    httpMethod,
-                    operationName,
-                    usedInputNames,
-                    getModelData,
-                    operationImportPath,
-                    getBinaryType,
-                    dependencyImports,
-                    jsDocRenderConfig,
-                    generateOperationRequestBodyArgumentName,
-                    mediaTypeArgumentName,
-                    generateOperationRequestBodyJsDoc
-                });
+                    usedInputNames
+                );
                 requestBodyArgumentNames = requestBodyInputs.requestBodyArgumentNames;
                 argumentExtensionType = requestBodyInputs.argumentExtensionType;
             }

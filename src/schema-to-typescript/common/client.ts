@@ -8,6 +8,7 @@ import type { OpenApiPaths } from '../../schemas/openapi.ts';
 import {makeProtected} from '../../utils/ast.ts';
 import { addDependencyImport, extendDependencyImports, generateTsImports } from '../../utils/dependencies.ts';
 import type { DependencyImports } from '../../utils/dependencies.ts';
+import { resolveJsDocWithHook } from '../../utils/hooks.ts';
 import { attachJsDocComment, renderJsDoc } from '../../utils/jsdoc.ts';
 import type { JsDocBlock, JsDocRenderConfig } from '../../utils/jsdoc.ts';
 import {getFilenameAndImportPath, getRelativeImportPath} from '../../utils/paths.ts';
@@ -112,9 +113,7 @@ export function generateClient({
         attachJsDocComment(
             exportErrorClass !== false ? exportNamedDeclaration(errorClassDeclaration) : errorClassDeclaration,
             renderJsDoc(
-                generateErrorJsDoc
-                    ? generateErrorJsDoc({suggestedJsDoc: errorClassSuggestedJsDoc, info})
-                    : errorClassSuggestedJsDoc,
+                resolveJsDocWithHook(errorClassSuggestedJsDoc, generateErrorJsDoc, {info}),
                 jsDocRenderConfig
             )
         )
@@ -296,7 +295,7 @@ export function generateClient({
         exportNamedDeclaration(
             classDeclaration(identifier(name), identifier(commonHttpServiceClassName), clientClassBody)
         ),
-        renderJsDoc(generateJsDoc ? generateJsDoc({suggestedJsDoc: jsdoc, info}) : jsdoc, jsDocRenderConfig)
+        renderJsDoc(resolveJsDocWithHook(jsdoc, generateJsDoc, {info}), jsDocRenderConfig)
     );
 
     const typeExportSpecifiers = [];

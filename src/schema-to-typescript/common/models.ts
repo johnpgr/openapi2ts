@@ -3,12 +3,13 @@ import { exportNamedDeclaration, identifier, isTSIndexSignature, isTSIntersectio
 import type { ExportNamedDeclaration, TSType } from '../../emit/index.ts';
 import ts from 'typescript';
 import {groupBy} from '../../utils/collections.ts';
-import {generateBinaryType} from './binary.ts';
+import {createBinaryTypeGetter} from './binary.ts';
 import type { OpenApiSchema } from '../../schemas/common.ts';
 import { openApiHttpMethods } from '../../schemas/openapi.ts';
 import type { OpenApiPaths } from '../../schemas/openapi.ts';
 import { addDependencyImport, collectSchemaDependencies, extendDependenciesAndGetResult, generateTsImports } from '../../utils/dependencies.ts';
 import type { DependencyImports } from '../../utils/dependencies.ts';
+import { resolveJsDocWithHook, resolveWithHook } from '../../utils/hooks.ts';
 import { attachJsDocComment, extractJsDoc, renderJsDoc } from '../../utils/jsdoc.ts';
 import type { JsDocRenderConfig } from '../../utils/jsdoc.ts';
 import {getRelativeImportPath} from '../../utils/paths.ts';
@@ -74,31 +75,22 @@ function generateTypeExport({
     jsDocRenderConfig: JsDocRenderConfig;
 }) {
     const dependencyImports: DependencyImports = {};
+    const getBinaryType = createBinaryTypeGetter(binaryTypes, importPath, dependencyImports);
     const schemaType = generateSchemaType({
         schema,
         getTypeName: getModelName,
-        getBinaryType: () =>
-            extendDependenciesAndGetResult(generateBinaryType(binaryTypes, importPath), dependencyImports),
+        getBinaryType,
         processJsDoc:
             generateJsDoc &&
             ((jsdoc, schemaEntity, fieldPath: OpenApiSchemaFieldPathItem[]) =>
-                generateJsDoc({
-                    suggestedJsDoc: jsdoc,
-                    schema: schemaEntity,
-                    schemaName,
-                    fieldPath
-                }))
+                resolveJsDocWithHook(jsdoc, generateJsDoc, {schema: schemaEntity, schemaName, fieldPath}))
     });
 
-    let jsdoc = extractJsDoc(schema);
-    if (generateJsDoc) {
-        jsdoc = generateJsDoc({
-            suggestedJsDoc: jsdoc,
-            schemaName,
-            fieldPath: [],
-            schema
-        });
-    }
+    const jsdoc = resolveJsDocWithHook(extractJsDoc(schema), generateJsDoc, {
+        schemaName,
+        fieldPath: [],
+        schema
+    });
     return {
         result: attachJsDocComment(
             exportNamedDeclaration(createModelDeclaration(modelName, schemaType)),
@@ -298,12 +290,7 @@ export function generateModels({
 
     function getModelName(schemaName: string) {
         const suggestedName = applyEntityNameCase(schemaName, 'pascalCase');
-        return generateName
-            ? generateName({
-                  suggestedName,
-                  schemaName
-              })
-            : suggestedName;
+        return resolveWithHook(suggestedName, generateName, {suggestedName, schemaName});
     }
 
     collectSchemaInfoForTag(defaultScope, extractedTags.rest, schemaInfos);

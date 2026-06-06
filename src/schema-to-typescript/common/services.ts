@@ -7,6 +7,7 @@ import { openApiHttpMethods } from '../../schemas/openapi.ts';
 import type { OpenApiPaths, OpenApiTag } from '../../schemas/openapi.ts';
 import {makeProtected} from '../../utils/ast.ts';
 import {generateTsImports} from '../../utils/dependencies.ts';
+import { resolveJsDocWithHook, resolveWithHook } from '../../utils/hooks.ts';
 import { attachJsDocComment, renderJsDoc } from '../../utils/jsdoc.ts';
 import type { JsDocBlock, JsDocRenderConfig } from '../../utils/jsdoc.ts';
 import {getRelativeImportPath} from '../../utils/paths.ts';
@@ -79,16 +80,15 @@ export function generateServices({
             formatFilename(tag, {...defaultServiceFilenameFormat, ...filenameFormat})
         );
         const suggestedName = applyEntityNameCase(tag + '-service', 'pascalCase');
-        const serviceName = generateName
-            ? generateName({
-                  suggestedName,
-                  tag: tags[tag] ?? {name: tag},
-                  paths
-              })
-            : suggestedName;
+        const tagInfo = tags[tag] ?? {name: tag};
+        const serviceName = resolveWithHook(suggestedName, generateName, {
+            suggestedName,
+            tag: tagInfo,
+            paths
+        });
 
         let jsdoc: JsDocBlock = {
-            description: tags[tag]?.description,
+            description: tagInfo.description,
             tags: []
         };
         if (
@@ -98,14 +98,7 @@ export function generateServices({
         ) {
             jsdoc.tags.push({name: 'deprecated'});
         }
-        if (generateJsDoc) {
-            jsdoc = generateJsDoc({
-                suggestedJsDoc: jsdoc,
-                serviceName,
-                tag: tags[tag] ?? {name: tag},
-                paths
-            });
-        }
+        jsdoc = resolveJsDocWithHook(jsdoc, generateJsDoc, {serviceName, tag: tagInfo, paths});
 
         services.push({
             name: serviceName,

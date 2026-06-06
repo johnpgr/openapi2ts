@@ -61,3 +61,11 @@ export function generateBinaryType(
     }
     return {result: simplifyUnionTypeIfPossible(tsUnionType(types)), dependencyImports};
 }
+
+export function createBinaryTypeGetter(
+    binaryTypes: OpenApiClientCustomizableBinaryType[],
+    basePath: string,
+    dependencyImports: DependencyImports
+): () => TSType {
+    return () => extendDependenciesAndGetResult(generateBinaryType(binaryTypes, basePath), dependencyImports);
+}
