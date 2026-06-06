@@ -61,12 +61,12 @@ Relative imports in `src/` use explicit `.ts` extensions (Node native ESM). Afte
 
 This package is **not published to npm (and never will be)**. Install it from GitHub releases so consumer apps use a tagged version instead of whatever commit is currently on the default branch.
 
-GitHub releases are based on git tags. Keep release tags semver-shaped (`v0.1.0`, `v0.2.0`, etc.) and npm can resolve the newest matching tag:
+GitHub releases are based on git tags. Keep release tags semver-shaped (`v1.0.0`, `v2.0.0`, etc.) and npm can resolve the newest matching tag:
 
 ```json
 {
   "dependencies": {
-    "openapi2ts": "github:johnpgr/openapi2ts#semver:^0.1.0"
+    "openapi2ts": "github:johnpgr/openapi2ts#semver:^1.0.0"
   },
   "devDependencies": {
     "typescript": "^6.0.0"
@@ -93,12 +93,12 @@ If you need to pin an exact release instead of a semver range:
 ```json
 {
   "dependencies": {
-    "openapi2ts": "github:johnpgr/openapi2ts#v0.1.0"
+    "openapi2ts": "github:johnpgr/openapi2ts#v1.0.0"
   }
 }
 ```
 
-npm does not read GitHub's "Latest" release label directly; it resolves git tags. Use `#semver:^0.1.0` when you want npm to move to the newest compatible release tag after `npm update openapi2ts`.
+npm does not read GitHub's "Latest" release label directly; it resolves git tags. Use `#semver:^1.0.0` when you want npm to move to the newest compatible release tag after `npm update openapi2ts`.
 
 ### 1. Add a config and generate
 
@@ -217,19 +217,19 @@ npm test
 npm run typecheck
 npm version patch --no-git-tag-version   # or minor/major
 git add package.json package-lock.json
-git commit -m "Release v0.1.1"
-git tag -a v0.1.1 -m "v0.1.1"
+git commit -m "Release v1.0.0"
+git tag -a v1.0.0 -m "v1.0.0"
 git push origin master
-git push origin v0.1.1
+git push origin v1.0.0
 ```
 
 Then create the GitHub Release from the pushed tag:
 
 ```bash
-gh release create v0.1.1 --title "v0.1.1" --notes "Release notes here"
+gh release create v1.0.0 --title "v1.0.0" --notes "Release notes here"
 ```
 
-The `package.json` version and tag should match. Consumer installs like `github:johnpgr/openapi2ts#semver:^0.1.0` depend on those release tags staying semver-compatible.
+The `package.json` version and tag should match. Consumer installs like `github:johnpgr/openapi2ts#semver:^1.0.0` depend on those release tags staying semver-compatible.
 
 ---
 
