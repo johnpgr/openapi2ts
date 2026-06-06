@@ -1,26 +1,26 @@
-import ts from 'typescript';
-import {wordWrap} from './string-utils.ts';
-import type { AnnotatedApiEntity } from '../schema-to-typescript/common.ts';
-import type { OpenApiClientGeneratorConfig } from '../schema-to-typescript/openapi-to-typescript-client.ts';
+import ts from "typescript";
+import { wordWrap } from "./string-utils.ts";
+import type { AnnotatedApiEntity } from "../schema-to-typescript/common.ts";
+import type { OpenApiClientGeneratorConfig } from "../schema-to-typescript/openapi-to-typescript-client.ts";
 
 function processDescription(info: string): string {
     return info
         .trim()
-        .replace(/<a\s*href\s*=\s*['"]([^'"]+)['"]\s*>/g, '$1 ')
-        .replace(/<br\s*\/?>/g, '\n')
-        .replace(/<\/a>/g, '');
+        .replace(/<a\s*href\s*=\s*['"]([^'"]+)['"]\s*>/g, "$1 ")
+        .replace(/<br\s*\/?>/g, "\n")
+        .replace(/<\/a>/g, "");
 }
 
 function stringifyExample(example: unknown): string {
     const result = JSON.stringify(example, null, 2);
     if (Array.isArray(example)) {
-        return '```\n' + result + '\n```';
+        return "```\n" + result + "\n```";
     }
     return result;
 }
 
 function exampleToString(example: unknown) {
-    if (typeof example !== 'string') {
+    if (typeof example !== "string") {
         return stringifyExample(example);
     }
     try {
@@ -42,8 +42,8 @@ export interface JsDocBlockTag {
 }
 
 export function extractJsDoc(entity: AnnotatedApiEntity | boolean): JsDocBlock {
-    const result: JsDocBlock = {tags: []};
-    if (typeof entity === 'boolean') {
+    const result: JsDocBlock = { tags: [] };
+    if (typeof entity === "boolean") {
         return result;
     }
     if (entity.title) {
@@ -53,10 +53,10 @@ export function extractJsDoc(entity: AnnotatedApiEntity | boolean): JsDocBlock {
         result.description = processDescription(entity.description);
     }
     if (entity.deprecated) {
-        result.tags.push({name: 'deprecated'});
+        result.tags.push({ name: "deprecated" });
     }
     if (entity.example !== undefined) {
-        result.tags.push({name: 'example', value: '\n' + exampleToString(entity.example).trim()});
+        result.tags.push({ name: "example", value: "\n" + exampleToString(entity.example).trim() });
     }
     if (entity.examples !== undefined) {
         for (const [exampleName, example] of Object.entries(entity.examples)) {
@@ -65,8 +65,8 @@ export function extractJsDoc(entity: AnnotatedApiEntity | boolean): JsDocBlock {
                 exampleInfo.push(example.description);
             }
             result.tags.push({
-                name: 'example',
-                value: `${exampleInfo.length > 0 ? ` ${exampleInfo.join('. ')}` : ''}\n${exampleToString(example.value)}`
+                name: "example",
+                value: `${exampleInfo.length > 0 ? ` ${exampleInfo.join(". ")}` : ""}\n${exampleToString(example.value)}`,
             });
         }
     }
@@ -74,15 +74,15 @@ export function extractJsDoc(entity: AnnotatedApiEntity | boolean): JsDocBlock {
 }
 
 export function renderJsDocList(items: string[]): string {
-    return items.map((item) => ` * ${item.trim().replace(/\n/g, '\n   ')}`).join('\n\n');
+    return items.map((item) => ` * ${item.trim().replace(/\n/g, "\n   ")}`).join("\n\n");
 }
 
 function renderJsDocTagAsPlainText(tag: JsDocBlockTag): string {
     let result = `${tag.name}`;
 
     if (tag.value) {
-        if (tag.name === 'example') {
-            const value = tag.value.replace(/[\n]?$/g, '\n');
+        if (tag.name === "example") {
+            const value = tag.value.replace(/[\n]?$/g, "\n");
             if (value.match(/^[\n]/)) {
                 if (value.match(/^\n```/)) {
                     result += `:\n${value}`;
@@ -93,9 +93,9 @@ function renderJsDocTagAsPlainText(tag: JsDocBlockTag): string {
                 result += `:${value.replace(/^([^\n]+)\n/, ' "$1":\n```')}\`\`\``;
             }
         } else {
-            result += ':';
+            result += ":";
             if (!tag.value.match(/^[\n\r \t]/)) {
-                result += ' ';
+                result += " ";
             }
             result += tag.value;
         }
@@ -115,24 +115,24 @@ export function renderJsDocAsPlainText(jsdoc: JsDocBlock): string | null {
         bits.push(description);
     }
     if (jsdoc.tags.length > 0) {
-        bits.push(jsdoc.tags.map(renderJsDocTagAsPlainText).join('\n'));
+        bits.push(jsdoc.tags.map(renderJsDocTagAsPlainText).join("\n"));
     }
     if (bits.length === 0) {
         return null;
     }
-    return bits.join('\n\n');
+    return bits.join("\n\n");
 }
 
 const defaultWordWrapLineWidth = 80;
 
-export type JsDocRenderConfig = OpenApiClientGeneratorConfig['jsDoc'];
+export type JsDocRenderConfig = OpenApiClientGeneratorConfig["jsDoc"];
 
 function renderJsDocTag(tag: JsDocBlockTag): string {
     let result = `@${tag.name}`;
 
     if (tag.value) {
         if (!tag.value.match(/^[\n\r \t]/)) {
-            result += ' ';
+            result += " ";
         }
         result += tag.value;
     }
@@ -158,32 +158,31 @@ export function renderJsDoc(jsdoc: JsDocBlock, config: JsDocRenderConfig = {}): 
         jsdocParts.push(processText(description));
     }
     if (jsdoc.tags.length > 0) {
-        jsdocParts.push(jsdoc.tags.map(renderJsDocTag).join('\n'));
+        jsdocParts.push(jsdoc.tags.map(renderJsDocTag).join("\n"));
     }
     if (jsdocParts.length === 0) {
         return null;
     }
-    return jsdocParts.join('\n\n');
+    return jsdocParts.join("\n\n");
 }
 
 export function attachJsDocComment<T extends ts.Node>(node: T, jsdoc: string | null): T {
     if (!jsdoc) {
         return node;
     }
-    const sanitized = jsdoc.replace(/\*\//g, '* /');
-    if (!sanitized.includes('\n')) {
+    const sanitized = jsdoc.replace(/\*\//g, "* /");
+    if (!sanitized.includes("\n")) {
         return ts.addSyntheticLeadingComment(
             node,
             ts.SyntaxKind.MultiLineCommentTrivia,
             `* ${sanitized} `,
-            true
+            true,
         ) as T;
     }
     return ts.addSyntheticLeadingComment(
         node,
         ts.SyntaxKind.MultiLineCommentTrivia,
-        `*\n * ${sanitized.split('\n').join('\n * ')}\n `,
-        true
+        `*\n * ${sanitized.split("\n").join("\n * ")}\n `,
+        true,
     ) as T;
 }
-

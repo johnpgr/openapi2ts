@@ -2,7 +2,7 @@ export function ucFirst(input: string) {
     return input[0].toUpperCase() + input.slice(1);
 }
 
-export type EntityNameCase = 'kebabCase' | 'camelCase' | 'snakeCase' | 'pascalCase';
+export type EntityNameCase = "kebabCase" | "camelCase" | "snakeCase" | "pascalCase";
 
 export interface FilenameFormat {
     filenameCase?: EntityNameCase;
@@ -15,9 +15,9 @@ export function applyEntityNameCase(input: string, entityNameCase: EntityNameCas
     let before = input;
     for (;;) {
         input = input
-            .replace(/([a-z0-9])([A-Z][a-z]|[A-Z]{2,})/g, '$1 $2')
-            .replace(/([a-z][0-9]+)([a-z])/g, '$1 $2')
-            .replace(/([A-Z]{2,}[0-9]*)([A-Z][a-z])/g, '$1 $2');
+            .replace(/([a-z0-9])([A-Z][a-z]|[A-Z]{2,})/g, "$1 $2")
+            .replace(/([a-z][0-9]+)([a-z])/g, "$1 $2")
+            .replace(/([A-Z]{2,}[0-9]*)([A-Z][a-z])/g, "$1 $2");
         if (input === before) {
             break;
         }
@@ -25,39 +25,44 @@ export function applyEntityNameCase(input: string, entityNameCase: EntityNameCas
     }
 
     const bits = input
-        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
         .split(/[^a-zA-Z0-9]+/)
         .map((bit) => bit.toLowerCase())
         .filter((bit) => Boolean(bit));
 
     if (bits.length === 0) {
-        return '';
+        return "";
     }
 
-    if (entityNameCase === 'pascalCase') {
-        return bits.map(ucFirst).join('');
+    if (entityNameCase === "pascalCase") {
+        return bits.map(ucFirst).join("");
     }
-    if (entityNameCase === 'camelCase') {
-        return bits.shift() + bits.map(ucFirst).join('');
+    if (entityNameCase === "camelCase") {
+        return bits.shift() + bits.map(ucFirst).join("");
     }
-    if (entityNameCase === 'kebabCase') {
-        return bits.join('-');
+    if (entityNameCase === "kebabCase") {
+        return bits.join("-");
     }
-    if (entityNameCase === 'snakeCase') {
-        return bits.join('_');
+    if (entityNameCase === "snakeCase") {
+        return bits.join("_");
     }
     throw new Error(`Unknown entity name case: ${entityNameCase}`);
 }
 
 export function formatFilename(
     input: string,
-    {filenameCase = 'kebabCase', extension = '', postfix = '', prefix = ''}: FilenameFormat | undefined = {}
+    {
+        filenameCase = "kebabCase",
+        extension = "",
+        postfix = "",
+        prefix = "",
+    }: FilenameFormat | undefined = {},
 ) {
     return `${prefix}${applyEntityNameCase(input, filenameCase)}${postfix}${extension}`;
 }
 
 function rTrim(input: string): string {
-    return input.replace(/\s+$/, '');
+    return input.replace(/\s+$/, "");
 }
 
 function wordWrapLine(line: string, width: number): string {
@@ -82,7 +87,7 @@ function wordWrapLine(line: string, width: number): string {
     if (line.trim().length > 0) {
         resultBits.push(line);
     }
-    return resultBits.join('\n');
+    return resultBits.join("\n");
 }
 
 export function wordWrap(input: string, lineWidth: number) {
@@ -90,5 +95,5 @@ export function wordWrap(input: string, lineWidth: number) {
         .split(/\r?\n/)
         .map(rTrim)
         .map((l) => wordWrapLine(l, lineWidth))
-        .join('\n');
+        .join("\n");
 }

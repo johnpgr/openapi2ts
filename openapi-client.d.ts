@@ -1,1 +1,1 @@
-export type * from './src/openapi-client.ts';
+export type * from "./src/openapi-client.ts";

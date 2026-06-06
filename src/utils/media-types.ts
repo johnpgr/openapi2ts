@@ -5,5 +5,5 @@ export function isJsonMediaType(mediaType: string) {
 }
 
 export function isWildcardMediaType(mediaType: string) {
-    return mediaType.includes('*');
+    return mediaType.includes("*");
 }

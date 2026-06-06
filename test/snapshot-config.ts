@@ -1,3 +1,3 @@
-import {createPetstoreConfig} from './petstore-config.ts';
+import { createPetstoreConfig } from "./petstore-config.ts";
 
-export default createPetstoreConfig('snapshots/petstore');
+export default createPetstoreConfig("snapshots/petstore");

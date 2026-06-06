@@ -1,37 +1,82 @@
-import { arrowFunctionExpression, assignmentPattern, blockStatement, callExpression, classProperty, identifier, isValidIdentifier, memberExpression, objectExpression, objectPattern, objectPatternProperty, objectProperty, returnStatement, setArrowFunctionReturnType, stringLiteral, thisExpression, tsLiteralType, tsPropertySignature, tsStringKeyword, tsTypeAnnotation, tsTypeLiteral, tsTypeParameterInstantiation, tsTypeReference, tsUndefinedKeyword, tsUnionType } from '../../emit/index.ts';
-import type { ClassProperty, Expression, Identifier, TSType } from '../../emit/index.ts';
-import ts from 'typescript';
-import {uniq} from '../../utils/collections.ts';
-import {createBinaryTypeGetter} from './binary.ts';
-import type { GetModelData } from './models.ts';
-import {getOperationReturnType} from './operation-return.ts';
-import type { OpenApiParameter, OpenApiSchema } from '../../schemas/common.ts';
-import { openApiHttpMethods } from '../../schemas/openapi.ts';
-import type { OpenApiMediaType, OpenApiOperation, OpenApiPathItem, OpenApiPaths, OpenApiRequestBody } from '../../schemas/openapi.ts';
-import { extendDependenciesAndGetResult, extendDependencyImports, generateSchemaTypeAndImports } from '../../utils/dependencies.ts';
-import type { DependencyImports } from '../../utils/dependencies.ts';
-import { resolveJsDocWithHook, resolveWithHook, renderJsDocWithHook } from '../../utils/hooks.ts';
-import { attachJsDocComment, extractJsDoc, renderJsDoc } from '../../utils/jsdoc.ts';
-import type { JsDocRenderConfig } from '../../utils/jsdoc.ts';
-import {isJsonMediaType, isWildcardMediaType} from '../../utils/media-types.ts';
-import {buildParametersSerializationInfo} from '../../utils/parameter-serialization-styles.ts';
-import {applyEntityNameCase} from '../../utils/string-utils.ts';
-import {getUserFreiendlySchemaName, isAssignableToEmptyObject, mergeTypes} from '../../utils/type-utils.ts';
-import {objectPropertyKey, valueToAstExpression} from '../common.ts';
-import type { OpenApiClientCustomizableBinaryType, OpenApiClientGeneratorConfig } from '../openapi-to-typescript-client.ts';
+import {
+    arrowFunctionExpression,
+    assignmentPattern,
+    blockStatement,
+    callExpression,
+    classProperty,
+    identifier,
+    isValidIdentifier,
+    memberExpression,
+    objectExpression,
+    objectPattern,
+    objectPatternProperty,
+    objectProperty,
+    returnStatement,
+    setArrowFunctionReturnType,
+    stringLiteral,
+    thisExpression,
+    tsLiteralType,
+    tsPropertySignature,
+    tsStringKeyword,
+    tsTypeAnnotation,
+    tsTypeLiteral,
+    tsTypeParameterInstantiation,
+    tsTypeReference,
+    tsUndefinedKeyword,
+    tsUnionType,
+} from "../../emit/index.ts";
+import type { ClassProperty, Expression, Identifier, TSType } from "../../emit/index.ts";
+import ts from "typescript";
+import { uniq } from "../../utils/collections.ts";
+import { createBinaryTypeGetter } from "./binary.ts";
+import type { GetModelData } from "./models.ts";
+import { getOperationReturnType } from "./operation-return.ts";
+import type { OpenApiParameter, OpenApiSchema } from "../../schemas/common.ts";
+import { openApiHttpMethods } from "../../schemas/openapi.ts";
+import type {
+    OpenApiMediaType,
+    OpenApiOperation,
+    OpenApiPathItem,
+    OpenApiPaths,
+    OpenApiRequestBody,
+} from "../../schemas/openapi.ts";
+import {
+    extendDependenciesAndGetResult,
+    extendDependencyImports,
+    generateSchemaTypeAndImports,
+} from "../../utils/dependencies.ts";
+import type { DependencyImports } from "../../utils/dependencies.ts";
+import { resolveJsDocWithHook, resolveWithHook, renderJsDocWithHook } from "../../utils/hooks.ts";
+import { attachJsDocComment, extractJsDoc, renderJsDoc } from "../../utils/jsdoc.ts";
+import type { JsDocRenderConfig } from "../../utils/jsdoc.ts";
+import { isJsonMediaType, isWildcardMediaType } from "../../utils/media-types.ts";
+import { buildParametersSerializationInfo } from "../../utils/parameter-serialization-styles.ts";
+import { applyEntityNameCase } from "../../utils/string-utils.ts";
+import {
+    getUserFreiendlySchemaName,
+    isAssignableToEmptyObject,
+    mergeTypes,
+} from "../../utils/type-utils.ts";
+import { objectPropertyKey, valueToAstExpression } from "../common.ts";
+import type {
+    OpenApiClientCustomizableBinaryType,
+    OpenApiClientGeneratorConfig,
+} from "../openapi-to-typescript-client.ts";
 
 const parametersSortTable = {
     path: 0,
     query: 1,
     header: 2,
-    cookie: 3
+    cookie: 3,
 };
 function sortParameters(parameters: OpenApiParameter[]) {
-    return parameters.concat().sort((a, b) => parametersSortTable[a.in] - parametersSortTable[b.in]);
+    return parameters
+        .concat()
+        .sort((a, b) => parametersSortTable[a.in] - parametersSortTable[b.in]);
 }
 
 function generateUniqueName(source: string, postfixes: string[], usedNames: Record<string, true>) {
-    let result = applyEntityNameCase(source, 'camelCase');
+    let result = applyEntityNameCase(source, "camelCase");
     if (!result && isValidIdentifier(source)) {
         result = source;
     }
@@ -39,17 +84,19 @@ function generateUniqueName(source: string, postfixes: string[], usedNames: Reco
         return result;
     }
     for (const postfix of postfixes) {
-        const result = applyEntityNameCase(`${source} ${postfix}`, 'camelCase');
+        const result = applyEntityNameCase(`${source} ${postfix}`, "camelCase");
         if (result && !usedNames[result]) {
             return result;
         }
     }
     let i = 0;
     const baseName =
-        applyEntityNameCase(source, 'camelCase') || (isValidIdentifier(source) ? source : postfixes[0]) || 'param';
+        applyEntityNameCase(source, "camelCase") ||
+        (isValidIdentifier(source) ? source : postfixes[0]) ||
+        "param";
     while (usedNames[result]) {
         i++;
-        result = applyEntityNameCase(`${baseName} ${i}`, 'camelCase');
+        result = applyEntityNameCase(`${baseName} ${i}`, "camelCase");
     }
     return result;
 }
@@ -69,12 +116,15 @@ interface OpenApiParameterValue {
     value: Expression;
 }
 
-type OperationInputParameterLocation = Exclude<OpenApiParameter['in'], 'cookie'> | 'body';
+type OperationInputParameterLocation = Exclude<OpenApiParameter["in"], "cookie"> | "body";
 type OperationInputParameters = {
-    [K in OperationInputParameterLocation]: (OpenApiParameterFromArgument | OpenApiParameterValue)[];
+    [K in OperationInputParameterLocation]: (
+        | OpenApiParameterFromArgument
+        | OpenApiParameterValue
+    )[];
 };
 
-type OperationsConfig = OpenApiClientGeneratorConfig['operations'];
+type OperationsConfig = OpenApiClientGeneratorConfig["operations"];
 
 interface OperationMethodContext {
     operation: OpenApiOperation;
@@ -97,11 +147,11 @@ interface OperationMethodSchemaContext extends OperationMethodContext, SchemaTyp
 }
 
 interface OperationMethodHooks {
-    generateOperationParameterArgumentName?: NonNullable<OperationsConfig>['generateOperationParameterArgumentName'];
-    generateOperationParameterJsDoc?: NonNullable<OperationsConfig>['generateOperationParameterJsDoc'];
-    generateOperationRequestBodyArgumentName?: NonNullable<OperationsConfig>['generateOperationRequestBodyArgumentName'];
-    generateOperationRequestBodyJsDoc?: NonNullable<OperationsConfig>['generateOperationRequestBodyJsDoc'];
-    mediaTypeArgumentName?: NonNullable<OperationsConfig>['mediaTypeArgumentName'];
+    generateOperationParameterArgumentName?: NonNullable<OperationsConfig>["generateOperationParameterArgumentName"];
+    generateOperationParameterJsDoc?: NonNullable<OperationsConfig>["generateOperationParameterJsDoc"];
+    generateOperationRequestBodyArgumentName?: NonNullable<OperationsConfig>["generateOperationRequestBodyArgumentName"];
+    generateOperationRequestBodyJsDoc?: NonNullable<OperationsConfig>["generateOperationRequestBodyJsDoc"];
+    mediaTypeArgumentName?: NonNullable<OperationsConfig>["mediaTypeArgumentName"];
 }
 
 function createOperationInputParameters(): OperationInputParameters {
@@ -109,7 +159,7 @@ function createOperationInputParameters(): OperationInputParameters {
         path: [],
         query: [],
         header: [],
-        body: []
+        body: [],
     };
 }
 
@@ -119,31 +169,40 @@ function generateSchemaType(schema: OpenApiSchema | boolean, ctx: SchemaTypeCont
             schema,
             sourceImportPath: ctx.operationImportPath,
             getModelData: ctx.getModelData,
-            getBinaryType: ctx.getBinaryType
+            getBinaryType: ctx.getBinaryType,
         }),
-        ctx.dependencyImports
+        ctx.dependencyImports,
     );
 }
 
 function isOperationParameterFromArgument(
-    value: OpenApiParameterFromArgument | OpenApiParameterValue
+    value: OpenApiParameterFromArgument | OpenApiParameterValue,
 ): value is OpenApiParameterFromArgument {
-    return 'argumentName' in value;
+    return "argumentName" in value;
 }
 
 function renderParameter(parameter: OpenApiParameterFromArgument | OpenApiParameterValue) {
-    const {paramName} = parameter;
+    const { paramName } = parameter;
     const propertyName = objectPropertyKey(paramName);
     if (isOperationParameterFromArgument(parameter)) {
-        const {destructuringName} = parameter;
-        return objectProperty(propertyName, identifier(destructuringName), false, paramName === destructuringName);
+        const { destructuringName } = parameter;
+        return objectProperty(
+            propertyName,
+            identifier(destructuringName),
+            false,
+            paramName === destructuringName,
+        );
     } else {
-        const {value} = parameter;
+        const { value } = parameter;
         return objectProperty(propertyName, value, false, false);
     }
 }
 
-function generateDestructuringName(paramName: string, postfixes: string[], usedInputNames: Record<string, true>) {
+function generateDestructuringName(
+    paramName: string,
+    postfixes: string[],
+    usedInputNames: Record<string, true>,
+) {
     let destructuringName = paramName;
     if (!isValidIdentifier(destructuringName, true)) {
         destructuringName = generateUniqueName(destructuringName, postfixes, usedInputNames);
@@ -160,57 +219,72 @@ function getParameterErrorLocation(param: OpenApiParameter, path: string, httpMe
     );
 }
 
-function createIncompatibleParameterStyleError(param: OpenApiParameter, path: string, httpMethod: string) {
-    return new Error(`Could not process parameter ${getParameterErrorLocation(param, path, httpMethod)}`);
+function createIncompatibleParameterStyleError(
+    param: OpenApiParameter,
+    path: string,
+    httpMethod: string,
+) {
+    return new Error(
+        `Could not process parameter ${getParameterErrorLocation(param, path, httpMethod)}`,
+    );
 }
 
 function validateOperationParameter(
     parameter: OpenApiParameter,
     path: string,
-    httpMethod: string
-): asserts parameter is OpenApiParameter & {in: Exclude<OpenApiParameter['in'], 'cookie'>} {
-    if (parameter.in === 'path') {
-        if (parameter.style && parameter.style !== 'simple') {
+    httpMethod: string,
+): asserts parameter is OpenApiParameter & { in: Exclude<OpenApiParameter["in"], "cookie"> } {
+    if (parameter.in === "path") {
+        if (parameter.style && parameter.style !== "simple") {
             throw createIncompatibleParameterStyleError(parameter, path, httpMethod);
         }
         if (!parameter.required) {
-            throw new Error(`Path parameters should be required: ${getParameterErrorLocation(parameter, path, httpMethod)}`);
+            throw new Error(
+                `Path parameters should be required: ${getParameterErrorLocation(parameter, path, httpMethod)}`,
+            );
         }
         return;
     }
-    if (parameter.in === 'query') {
-        if (parameter.style && parameter.style !== 'form') {
+    if (parameter.in === "query") {
+        if (parameter.style && parameter.style !== "form") {
             throw createIncompatibleParameterStyleError(parameter, path, httpMethod);
         }
         return;
     }
-    if (parameter.in === 'header') {
-        if (parameter.style && parameter.style !== 'simple') {
+    if (parameter.in === "header") {
+        if (parameter.style && parameter.style !== "simple") {
             throw createIncompatibleParameterStyleError(parameter, path, httpMethod);
         }
         return;
     }
-    if (parameter.in === 'cookie') {
-        throw new Error(`Parameters in cookies are not supported: ${getParameterErrorLocation(parameter, path, httpMethod)}`);
+    if (parameter.in === "cookie") {
+        throw new Error(
+            `Parameters in cookies are not supported: ${getParameterErrorLocation(parameter, path, httpMethod)}`,
+        );
     }
-    throw new Error(`Unknown parameter type ${parameter.in}: ${getParameterErrorLocation(parameter, path, httpMethod)}`);
+    throw new Error(
+        `Unknown parameter type ${parameter.in}: ${getParameterErrorLocation(parameter, path, httpMethod)}`,
+    );
 }
 
 function addOperationParameterInput(
     ctx: OperationMethodSchemaContext,
-    hooks: Pick<OperationMethodHooks, 'generateOperationParameterArgumentName' | 'generateOperationParameterJsDoc'>,
+    hooks: Pick<
+        OperationMethodHooks,
+        "generateOperationParameterArgumentName" | "generateOperationParameterJsDoc"
+    >,
     inputParameters: OperationInputParameters,
     parameter: OpenApiParameter,
-    usedInputNames: Record<string, true>
+    usedInputNames: Record<string, true>,
 ) {
-    const {path, httpMethod} = ctx;
+    const { path, httpMethod } = ctx;
     validateOperationParameter(parameter, path, httpMethod);
 
     const schema = parameter.schema ?? true;
-    if (typeof schema !== 'boolean' && schema.const !== undefined) {
+    if (typeof schema !== "boolean" && schema.const !== undefined) {
         inputParameters[parameter.in].push({
             paramName: parameter.name,
-            value: valueToAstExpression(schema.const)
+            value: valueToAstExpression(schema.const),
         });
         return;
     }
@@ -218,16 +292,16 @@ function addOperationParameterInput(
     const suggestedParameterName = generateUniqueName(
         parameter.name,
         [parameter.in, `${parameter.in} param`],
-        usedInputNames
+        usedInputNames,
     );
     const parameterName = generateUniqueName(
         resolveWithHook(suggestedParameterName, hooks.generateOperationParameterArgumentName, {
             ...ctx,
             parameter,
-            suggestedName: suggestedParameterName
+            suggestedName: suggestedParameterName,
         }),
         [],
-        usedInputNames
+        usedInputNames,
     );
     usedInputNames[parameterName] = true;
     inputParameters[parameter.in].push({
@@ -236,16 +310,16 @@ function addOperationParameterInput(
         destructuringName: generateDestructuringName(
             parameterName,
             [parameter.in, `${parameter.in} param`],
-            usedInputNames
+            usedInputNames,
         ),
         optional: !parameter.required,
         type: generateSchemaType(schema, ctx),
         docs: renderJsDocWithHook(
             extractJsDoc(parameter),
             hooks.generateOperationParameterJsDoc,
-            {...ctx, parameter},
-            ctx.jsDocRenderConfig
-        )
+            { ...ctx, parameter },
+            ctx.jsDocRenderConfig,
+        ),
     });
 }
 
@@ -263,17 +337,21 @@ function getRequestBodyMediaTypes(requestBody: OpenApiRequestBody) {
 
 function addMultiMediaTypeRequestBodyInputs(
     ctx: OperationMethodSchemaContext,
-    hooks: Pick<OperationMethodHooks, 'generateOperationRequestBodyJsDoc'>,
+    hooks: Pick<OperationMethodHooks, "generateOperationRequestBodyJsDoc">,
     inputParameters: OperationInputParameters,
-    mediaTypesWithRequestBodyNames: {mediaType: string; content: OpenApiMediaType; requestBodyName: string}[],
+    mediaTypesWithRequestBodyNames: {
+        mediaType: string;
+        content: OpenApiMediaType;
+        requestBodyName: string;
+    }[],
     allRequestBodyNames: string[],
     mediaTypeName: string,
     requestBody: OpenApiRequestBody,
-    usedInputNames: Record<string, true>
+    usedInputNames: Record<string, true>,
 ) {
     const additionUnion = tsUnionType([]);
     let defaultMediaType: string | undefined;
-    for (const {mediaType, content, requestBodyName} of mediaTypesWithRequestBodyNames) {
+    for (const { mediaType, content, requestBodyName } of mediaTypesWithRequestBodyNames) {
         const schema = content.schema ?? true;
         let isDefaultType = false;
         if (!defaultMediaType && isJsonMediaType(mediaType)) {
@@ -286,9 +364,9 @@ function addMultiMediaTypeRequestBodyInputs(
         const mediaTypePropertySignature = tsPropertySignature(
             identifier(mediaTypeName),
             tsTypeAnnotation(mediaTypeArgumentType),
-            isDefaultType
+            isDefaultType,
         );
-        const jsdoc = extractJsDoc({...requestBody, ...content});
+        const jsdoc = extractJsDoc({ ...requestBody, ...content });
         additionUnion.types.push(
             tsTypeLiteral([
                 mediaTypePropertySignature,
@@ -298,34 +376,40 @@ function addMultiMediaTypeRequestBodyInputs(
                         tsPropertySignature(
                             identifier(requestBodyName),
                             tsTypeAnnotation(
-                                isCurrentRequestBody ? generateSchemaType(schema, ctx) : tsUndefinedKeyword()
-                            )
+                                isCurrentRequestBody
+                                    ? generateSchemaType(schema, ctx)
+                                    : tsUndefinedKeyword(),
+                            ),
                         ),
                         renderJsDocWithHook(
                             jsdoc,
                             hooks.generateOperationRequestBodyJsDoc,
-                            {...ctx, content, requestBody, mediaType},
-                            ctx.jsDocRenderConfig
-                        )
+                            { ...ctx, content, requestBody, mediaType },
+                            ctx.jsDocRenderConfig,
+                        ),
                     );
-                    return tsPropertySignature(property.name, tsTypeAnnotation(property.type!), !isCurrentRequestBody);
-                })
-            ])
+                    return tsPropertySignature(
+                        property.name,
+                        tsTypeAnnotation(property.type!),
+                        !isCurrentRequestBody,
+                    );
+                }),
+            ]),
         );
     }
-    inputParameters['header'].push({
-        paramName: 'Content-Type',
+    inputParameters["header"].push({
+        paramName: "Content-Type",
         argumentName: mediaTypeName,
         destructuringName: generateDestructuringName(mediaTypeName, [], usedInputNames),
         docs: null,
-        defaultValue: defaultMediaType ? stringLiteral(defaultMediaType) : undefined
+        defaultValue: defaultMediaType ? stringLiteral(defaultMediaType) : undefined,
     });
     for (const requestBodyName of allRequestBodyNames) {
-        inputParameters['body'].push({
+        inputParameters["body"].push({
             argumentName: requestBodyName,
             destructuringName: generateDestructuringName(requestBodyName, [], usedInputNames),
             paramName: requestBodyName,
-            docs: null
+            docs: null,
         });
     }
     return additionUnion;
@@ -333,32 +417,32 @@ function addMultiMediaTypeRequestBodyInputs(
 
 function addSingleMediaTypeRequestBodyInputs(
     ctx: OperationMethodSchemaContext,
-    hooks: Pick<OperationMethodHooks, 'generateOperationRequestBodyJsDoc'>,
+    hooks: Pick<OperationMethodHooks, "generateOperationRequestBodyJsDoc">,
     inputParameters: OperationInputParameters,
     mediaType: string,
     content: OpenApiMediaType,
     requestBodyName: string,
     mediaTypeName: string,
     requestBody: OpenApiRequestBody,
-    usedInputNames: Record<string, true>
+    usedInputNames: Record<string, true>,
 ) {
     const schema = content.schema ?? true;
-    const jsdoc = extractJsDoc({...requestBody, ...content});
-    if (mediaType.includes('*')) {
-        inputParameters['header'].push({
-            paramName: 'Content-Type',
+    const jsdoc = extractJsDoc({ ...requestBody, ...content });
+    if (mediaType.includes("*")) {
+        inputParameters["header"].push({
+            paramName: "Content-Type",
             argumentName: mediaTypeName,
             destructuringName: generateDestructuringName(mediaTypeName, [], usedInputNames),
             docs: null,
-            type: tsStringKeyword()
+            type: tsStringKeyword(),
         });
     } else {
-        inputParameters['header'].push({
-            paramName: 'Content-Type',
-            value: stringLiteral(mediaType)
+        inputParameters["header"].push({
+            paramName: "Content-Type",
+            value: stringLiteral(mediaType),
         });
     }
-    inputParameters['body'].push({
+    inputParameters["body"].push({
         paramName: requestBodyName,
         argumentName: requestBodyName,
         destructuringName: generateDestructuringName(requestBodyName, [], usedInputNames),
@@ -366,9 +450,9 @@ function addSingleMediaTypeRequestBodyInputs(
         docs: renderJsDocWithHook(
             jsdoc,
             hooks.generateOperationRequestBodyJsDoc,
-            {...ctx, content, requestBody, mediaType},
-            ctx.jsDocRenderConfig
-        )
+            { ...ctx, content, requestBody, mediaType },
+            ctx.jsDocRenderConfig,
+        ),
     });
 }
 
@@ -376,40 +460,50 @@ function addRequestBodyInputs(
     ctx: OperationMethodSchemaContext,
     hooks: Pick<
         OperationMethodHooks,
-        'generateOperationRequestBodyArgumentName' | 'generateOperationRequestBodyJsDoc' | 'mediaTypeArgumentName'
+        | "generateOperationRequestBodyArgumentName"
+        | "generateOperationRequestBodyJsDoc"
+        | "mediaTypeArgumentName"
     >,
     inputParameters: OperationInputParameters,
     requestBody: OpenApiRequestBody,
-    usedInputNames: Record<string, true>
-): {requestBodyArgumentNames: string[]; argumentExtensionType?: TSType} {
-    inputParameters['body'] = [];
+    usedInputNames: Record<string, true>,
+): { requestBodyArgumentNames: string[]; argumentExtensionType?: TSType } {
+    inputParameters["body"] = [];
     const mediaTypes = getRequestBodyMediaTypes(requestBody);
-    const mediaTypeName = generateUniqueName(hooks.mediaTypeArgumentName ?? 'mediaType', [], usedInputNames);
+    const mediaTypeName = generateUniqueName(
+        hooks.mediaTypeArgumentName ?? "mediaType",
+        [],
+        usedInputNames,
+    );
     usedInputNames[mediaTypeName] = true;
     const mediaTypesWithRequestBodyNames = mediaTypes.map(([mediaType, content]) => {
         const requestBodySuggestedName = generateUniqueName(
-            getUserFreiendlySchemaName(content.schema ?? true) ?? 'request body',
+            getUserFreiendlySchemaName(content.schema ?? true) ?? "request body",
             [],
-            usedInputNames
+            usedInputNames,
         );
         return {
             mediaType,
             content,
             requestBodyName: generateUniqueName(
-                resolveWithHook(requestBodySuggestedName, hooks.generateOperationRequestBodyArgumentName, {
-                    ...ctx,
-                    content,
-                    requestBody,
-                    mediaType,
-                    suggestedName: requestBodySuggestedName
-                }),
+                resolveWithHook(
+                    requestBodySuggestedName,
+                    hooks.generateOperationRequestBodyArgumentName,
+                    {
+                        ...ctx,
+                        content,
+                        requestBody,
+                        mediaType,
+                        suggestedName: requestBodySuggestedName,
+                    },
+                ),
                 [],
-                usedInputNames
-            )
+                usedInputNames,
+            ),
         };
     });
     const requestBodyArgumentNames = uniq(
-        mediaTypesWithRequestBodyNames.map(({requestBodyName}) => requestBodyName)
+        mediaTypesWithRequestBodyNames.map(({ requestBodyName }) => requestBodyName),
     ).sort((a, b) => a.localeCompare(b));
 
     if (mediaTypesWithRequestBodyNames.length > 1) {
@@ -423,12 +517,12 @@ function addRequestBodyInputs(
                 requestBodyArgumentNames,
                 mediaTypeName,
                 requestBody,
-                usedInputNames
-            )
+                usedInputNames,
+            ),
         };
     }
     if (mediaTypesWithRequestBodyNames.length === 1) {
-        const [{mediaType, content, requestBodyName}] = mediaTypesWithRequestBodyNames;
+        const [{ mediaType, content, requestBodyName }] = mediaTypesWithRequestBodyNames;
         addSingleMediaTypeRequestBodyInputs(
             ctx,
             hooks,
@@ -438,10 +532,10 @@ function addRequestBodyInputs(
             requestBodyName,
             mediaTypeName,
             requestBody,
-            usedInputNames
+            usedInputNames,
         );
     }
-    return {requestBodyArgumentNames};
+    return { requestBodyArgumentNames };
 }
 
 export function generateOperationMethods({
@@ -458,34 +552,44 @@ export function generateOperationMethods({
         mediaTypeArgumentName,
         generateOperationParameterJsDoc,
         generateOperationRequestBodyJsDoc,
-        responseBinaryType = 'blob'
+        responseBinaryType = "blob",
     } = {},
     operationImportPath,
     binaryTypes,
-    jsDocRenderConfig
+    jsDocRenderConfig,
 }: {
     paths: OpenApiPaths;
     serviceName?: string;
     getModelData: GetModelData;
     commonHttpClientImportName: string;
-    operationsConfig?: OpenApiClientGeneratorConfig['operations'];
+    operationsConfig?: OpenApiClientGeneratorConfig["operations"];
     operationImportPath: string;
     binaryTypes: OpenApiClientCustomizableBinaryType[];
     jsDocRenderConfig: JsDocRenderConfig;
 }) {
     const dependencyImports: DependencyImports = {};
-    const getBinaryType = createBinaryTypeGetter(binaryTypes, operationImportPath, dependencyImports);
+    const getBinaryType = createBinaryTypeGetter(
+        binaryTypes,
+        operationImportPath,
+        dependencyImports,
+    );
     const parameterHooks: Pick<
         OperationMethodHooks,
-        'generateOperationParameterArgumentName' | 'generateOperationParameterJsDoc'
-    > = {generateOperationParameterArgumentName, generateOperationParameterJsDoc};
+        "generateOperationParameterArgumentName" | "generateOperationParameterJsDoc"
+    > = { generateOperationParameterArgumentName, generateOperationParameterJsDoc };
     const requestBodyHooks: Pick<
         OperationMethodHooks,
-        'generateOperationRequestBodyArgumentName' | 'generateOperationRequestBodyJsDoc' | 'mediaTypeArgumentName'
-    > = {generateOperationRequestBodyArgumentName, generateOperationRequestBodyJsDoc, mediaTypeArgumentName};
+        | "generateOperationRequestBodyArgumentName"
+        | "generateOperationRequestBodyJsDoc"
+        | "mediaTypeArgumentName"
+    > = {
+        generateOperationRequestBodyArgumentName,
+        generateOperationRequestBodyJsDoc,
+        mediaTypeArgumentName,
+    };
 
     const methodProperties: ClassProperty[] = [];
-    const deprecatedOperations: {[methodAndPath: string]: string} = {};
+    const deprecatedOperations: { [methodAndPath: string]: string } = {};
 
     for (const [path, pathItem] of Object.entries(paths)) {
         for (const httpMethod of openApiHttpMethods) {
@@ -495,16 +599,20 @@ export function generateOperationMethods({
             }
             const suggestedOperationMethodName = applyEntityNameCase(
                 operation.operationId ?? `${httpMethod}:${path}`,
-                'camelCase'
+                "camelCase",
             );
-            const operationName = resolveWithHook(suggestedOperationMethodName, generateOperationName, {
-                suggestedName: suggestedOperationMethodName,
-                operation,
-                pathItem,
-                path,
-                serviceName,
-                httpMethod
-            });
+            const operationName = resolveWithHook(
+                suggestedOperationMethodName,
+                generateOperationName,
+                {
+                    suggestedName: suggestedOperationMethodName,
+                    operation,
+                    pathItem,
+                    path,
+                    serviceName,
+                    httpMethod,
+                },
+            );
             if (operation.deprecated) {
                 deprecatedOperations[`${httpMethod.toUpperCase()} ${path}`] = operationName;
             }
@@ -513,7 +621,7 @@ export function generateOperationMethods({
                 getModelData,
                 operationImportPath,
                 commonHttpClientImportName,
-                binaryType: responseBinaryType
+                binaryType: responseBinaryType,
             });
             const parameters = sortParameters(operation.parameters ?? []);
             const usedInputNames: Record<string, true> = {};
@@ -529,23 +637,33 @@ export function generateOperationMethods({
                 operationImportPath,
                 getBinaryType,
                 dependencyImports,
-                jsDocRenderConfig
+                jsDocRenderConfig,
             };
             for (const parameter of parameters) {
-                addOperationParameterInput(ctx, parameterHooks, inputParameters, parameter, usedInputNames);
+                addOperationParameterInput(
+                    ctx,
+                    parameterHooks,
+                    inputParameters,
+                    parameter,
+                    usedInputNames,
+                );
             }
             let jsdoc = extractJsDoc(operation);
             if (operationReturn.suggestedDescription || generateOperationResultDescription) {
                 jsdoc.tags.push({
-                    name: 'returns',
-                    value: resolveWithHook(operationReturn.suggestedDescription, generateOperationResultDescription, {
-                        serviceName,
-                        suggestedDescription: operationReturn.suggestedDescription,
-                        operation,
-                        pathItem,
-                        path,
-                        httpMethod
-                    })
+                    name: "returns",
+                    value: resolveWithHook(
+                        operationReturn.suggestedDescription,
+                        generateOperationResultDescription,
+                        {
+                            serviceName,
+                            suggestedDescription: operationReturn.suggestedDescription,
+                            operation,
+                            pathItem,
+                            path,
+                            httpMethod,
+                        },
+                    ),
                 });
             }
             jsdoc = resolveJsDocWithHook(jsdoc, generateOperationJsDoc, {
@@ -553,12 +671,12 @@ export function generateOperationMethods({
                 httpMethod,
                 pathItem,
                 path,
-                operation
+                operation,
             });
 
             const requestObject = objectExpression([
-                objectProperty(identifier('path'), stringLiteral(path)),
-                objectProperty(identifier('method'), stringLiteral(httpMethod.toUpperCase()))
+                objectProperty(identifier("path"), stringLiteral(path)),
+                objectProperty(identifier("method"), stringLiteral(httpMethod.toUpperCase())),
             ]);
 
             let requestBodyArgumentNames: string[] | undefined;
@@ -570,46 +688,56 @@ export function generateOperationMethods({
                     requestBodyHooks,
                     inputParameters,
                     requestBody,
-                    usedInputNames
+                    usedInputNames,
                 );
                 requestBodyArgumentNames = requestBodyInputs.requestBodyArgumentNames;
                 argumentExtensionType = requestBodyInputs.argumentExtensionType;
             }
 
-            if (inputParameters['path'].length > 0) {
+            if (inputParameters["path"].length > 0) {
                 requestObject.properties.push(
                     objectProperty(
-                        identifier('pathParams'),
-                        objectExpression(inputParameters['path'].map(renderParameter))
-                    )
+                        identifier("pathParams"),
+                        objectExpression(inputParameters["path"].map(renderParameter)),
+                    ),
                 );
             }
 
-            if (inputParameters['query'].length > 0) {
+            if (inputParameters["query"].length > 0) {
                 requestObject.properties.push(
-                    objectProperty(identifier('query'), objectExpression(inputParameters['query'].map(renderParameter)))
+                    objectProperty(
+                        identifier("query"),
+                        objectExpression(inputParameters["query"].map(renderParameter)),
+                    ),
                 );
             }
 
-            if (inputParameters['header'].length > 0) {
+            if (inputParameters["header"].length > 0) {
                 requestObject.properties.push(
                     objectProperty(
-                        identifier('headers'),
-                        objectExpression(inputParameters['header'].map(renderParameter))
-                    )
+                        identifier("headers"),
+                        objectExpression(inputParameters["header"].map(renderParameter)),
+                    ),
                 );
             }
 
             const parametersSerializationInfo = buildParametersSerializationInfo(parameters);
             if (parametersSerializationInfo) {
-                requestObject.properties.push(objectProperty(identifier('parameters'), parametersSerializationInfo));
+                requestObject.properties.push(
+                    objectProperty(identifier("parameters"), parametersSerializationInfo),
+                );
             }
 
             const argument = objectPattern([]);
             const argumentType = tsTypeLiteral([]);
-            for (const {argumentName, destructuringName, type, optional, docs, defaultValue} of Object.values(
-                inputParameters
-            )
+            for (const {
+                argumentName,
+                destructuringName,
+                type,
+                optional,
+                docs,
+                defaultValue,
+            } of Object.values(inputParameters)
                 .flatMap((params) => params)
                 .filter(isOperationParameterFromArgument)) {
                 argument.properties.push(
@@ -619,36 +747,47 @@ export function generateOperationMethods({
                             ? assignmentPattern(identifier(destructuringName), defaultValue)
                             : identifier(destructuringName),
                         false,
-                        argumentName === destructuringName
-                    )
+                        argumentName === destructuringName,
+                    ),
                 );
                 if (type) {
                     const propertySignature = attachJsDocComment(
                         tsPropertySignature(identifier(argumentName), tsTypeAnnotation(type)),
-                        docs
+                        docs,
                     );
-                    argumentType.members.push(tsPropertySignature(propertySignature.name, tsTypeAnnotation(propertySignature.type!), optional));
+                    argumentType.members.push(
+                        tsPropertySignature(
+                            propertySignature.name,
+                            tsTypeAnnotation(propertySignature.type!),
+                            optional,
+                        ),
+                    );
                 }
             }
             argument.typeAnnotation = tsTypeAnnotation(
-                argumentExtensionType ? mergeTypes(argumentType, argumentExtensionType) : argumentType
+                argumentExtensionType
+                    ? mergeTypes(argumentType, argumentExtensionType)
+                    : argumentType,
             );
 
             if (requestBodyArgumentNames && requestBodyArgumentNames.length > 0) {
                 requestObject.properties.push(
                     objectProperty(
-                        identifier('body'),
+                        identifier("body"),
                         requestBodyArgumentNames.length > 1
                             ? callExpression(
-                                  memberExpression(identifier('commonHttpClient'), identifier('pickRequestBody')),
-                                  requestBodyArgumentNames.map(identifier)
+                                  memberExpression(
+                                      identifier("commonHttpClient"),
+                                      identifier("pickRequestBody"),
+                                  ),
+                                  requestBodyArgumentNames.map(identifier),
                               )
-                            : identifier(requestBodyArgumentNames[0])
-                    )
+                            : identifier(requestBodyArgumentNames[0]),
+                    ),
                 );
             }
 
-            const operationMethod = (
+            const operationMethod =
                 argument.properties.length > 0
                     ? arrowFunctionExpression(
                           argument,
@@ -658,20 +797,24 @@ export function generateOperationMethods({
                                       callExpression(
                                           memberExpression(
                                               callExpression(
-                                                  memberExpression(thisExpression(), identifier('getClientInstance')),
-                                                  []
+                                                  memberExpression(
+                                                      thisExpression(),
+                                                      identifier("getClientInstance"),
+                                                  ),
+                                                  [],
                                               ),
-                                              identifier('request')
+                                              identifier("request"),
                                           ),
-                                          [requestObject]
-                                      )
-                                  )
-                              )
+                                          [requestObject],
+                                      ),
+                                  ),
+                              ),
                           ]),
-                          argument.properties.length > 0 && isAssignableToEmptyObject(argument.typeAnnotation!)
+                          argument.properties.length > 0 &&
+                              isAssignableToEmptyObject(argument.typeAnnotation!)
                               ? objectExpression([])
                               : undefined,
-                          true
+                          true,
                       )
                     : arrowFunctionExpression(
                           [] as readonly ts.ParameterDeclaration[],
@@ -681,32 +824,41 @@ export function generateOperationMethods({
                                       callExpression(
                                           memberExpression(
                                               callExpression(
-                                                  memberExpression(thisExpression(), identifier('getClientInstance')),
-                                                  []
+                                                  memberExpression(
+                                                      thisExpression(),
+                                                      identifier("getClientInstance"),
+                                                  ),
+                                                  [],
                                               ),
-                                              identifier('request')
+                                              identifier("request"),
                                           ),
-                                          [requestObject]
-                                      )
-                                  )
-                              )
+                                          [requestObject],
+                                      ),
+                                  ),
+                              ),
                           ]),
                           undefined,
-                          true
-                      )
-            );
+                          true,
+                      );
             const operationMethodProperty = classProperty(
                 identifier(operationName),
                 setArrowFunctionReturnType(
                     operationMethod,
-                    tsTypeReference(identifier('Promise'), tsTypeParameterInstantiation([operationReturn.type]))
-                )
+                    tsTypeReference(
+                        identifier("Promise"),
+                        tsTypeParameterInstantiation([operationReturn.type]),
+                    ),
+                ),
             );
             extendDependencyImports(dependencyImports, operationReturn.dependencyImports);
-            methodProperties.push(attachJsDocComment(operationMethodProperty, renderJsDoc(jsdoc, jsDocRenderConfig)));
+            methodProperties.push(
+                attachJsDocComment(operationMethodProperty, renderJsDoc(jsdoc, jsDocRenderConfig)),
+            );
         }
     }
-    methodProperties.sort((a, b) => (a.name as Identifier).text.localeCompare((b.name as Identifier).text));
+    methodProperties.sort((a, b) =>
+        (a.name as Identifier).text.localeCompare((b.name as Identifier).text),
+    );
 
-    return {methods: methodProperties, dependencyImports, deprecatedOperations};
+    return { methods: methodProperties, dependencyImports, deprecatedOperations };
 }

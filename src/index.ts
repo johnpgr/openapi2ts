@@ -9,8 +9,11 @@ export type {
     OpenApiDocumentPatchTags,
     CommonOpenApiClientGeneratorConfigDocumentPatch,
     OpenApiDocumentPatchAllSchemas,
-    OpenApiDocumentPatchDocument
-} from './schema-to-typescript/config.ts';
-export type {JsDocBlockTag, JsDocBlock} from './utils/jsdoc.ts';
-export type {FilenameFormat, EntityNameCase} from './utils/string-utils.ts';
-export {stringIndexSignature, type OpenApiSchemaFieldPathItem} from './schema-to-typescript/common.ts';
+    OpenApiDocumentPatchDocument,
+} from "./schema-to-typescript/config.ts";
+export type { JsDocBlockTag, JsDocBlock } from "./utils/jsdoc.ts";
+export type { FilenameFormat, EntityNameCase } from "./utils/string-utils.ts";
+export {
+    stringIndexSignature,
+    type OpenApiSchemaFieldPathItem,
+} from "./schema-to-typescript/common.ts";

@@ -1,14 +1,37 @@
-import { booleanLiteral, callExpression, identifier, memberExpression, numericLiteral, objectExpression, objectProperty, stringLiteral, thisExpression, tsLiteralType, tsPropertySignature, tsQualifiedName, tsTypeAnnotation, tsTypeLiteral, tsTypeParameterInstantiation, tsTypeReference, tsUnionType, tsUnknownKeyword, tsVoidKeyword } from '../../emit/index.ts';
-import type { Expression, TSType } from '../../emit/index.ts';
-import type { GetModelData } from './models.ts';
-import type { OpenApiMediaType, OpenApiOperation, OpenApiResponse } from '../../schemas/openapi.ts';
-import { extendDependenciesAndGetResult, generateSchemaTypeAndImports } from '../../utils/dependencies.ts';
-import type { DependencyImports } from '../../utils/dependencies.ts';
-import {extractJsDoc, renderJsDocAsPlainText, renderJsDocList} from '../../utils/jsdoc.ts';
-import {isJsonMediaType} from '../../utils/media-types.ts';
-import {applyEntityNameCase, ucFirst} from '../../utils/string-utils.ts';
-import {getUserFreiendlySchemaName, simplifyUnionTypeIfPossible} from '../../utils/type-utils.ts';
-import type { OpenApiClientBuiltinBinaryType } from '../openapi-to-typescript-client.ts';
+import {
+    booleanLiteral,
+    callExpression,
+    identifier,
+    memberExpression,
+    numericLiteral,
+    objectExpression,
+    objectProperty,
+    stringLiteral,
+    thisExpression,
+    tsLiteralType,
+    tsPropertySignature,
+    tsQualifiedName,
+    tsTypeAnnotation,
+    tsTypeLiteral,
+    tsTypeParameterInstantiation,
+    tsTypeReference,
+    tsUnionType,
+    tsUnknownKeyword,
+    tsVoidKeyword,
+} from "../../emit/index.ts";
+import type { Expression, TSType } from "../../emit/index.ts";
+import type { GetModelData } from "./models.ts";
+import type { OpenApiMediaType, OpenApiOperation, OpenApiResponse } from "../../schemas/openapi.ts";
+import {
+    extendDependenciesAndGetResult,
+    generateSchemaTypeAndImports,
+} from "../../utils/dependencies.ts";
+import type { DependencyImports } from "../../utils/dependencies.ts";
+import { extractJsDoc, renderJsDocAsPlainText, renderJsDocList } from "../../utils/jsdoc.ts";
+import { isJsonMediaType } from "../../utils/media-types.ts";
+import { applyEntityNameCase, ucFirst } from "../../utils/string-utils.ts";
+import { getUserFreiendlySchemaName, simplifyUnionTypeIfPossible } from "../../utils/type-utils.ts";
+import type { OpenApiClientBuiltinBinaryType } from "../openapi-to-typescript-client.ts";
 
 export type ResultWrapper = (expression: Expression) => Expression;
 
@@ -29,14 +52,14 @@ const combineResultWrappers =
         return result;
     };
 
-type MediaTypesDistribution = Record<string, Record<string, 'json' | 'blob' | 'readableStream'>>;
+type MediaTypesDistribution = Record<string, Record<string, "json" | "blob" | "readableStream">>;
 
 export function getOperationReturnType({
     operation,
     getModelData,
     operationImportPath,
     commonHttpClientImportName,
-    binaryType
+    binaryType,
 }: {
     commonHttpClientImportName: string;
     operation: OpenApiOperation;
@@ -45,65 +68,79 @@ export function getOperationReturnType({
     binaryType: OpenApiClientBuiltinBinaryType;
 }): OperationReturnType {
     const getResponseBody = (expression: Expression) =>
-        callExpression(memberExpression(expression, identifier('then')), [
-            memberExpression(identifier(commonHttpClientImportName), identifier('getBody'))
+        callExpression(memberExpression(expression, identifier("then")), [
+            memberExpression(identifier(commonHttpClientImportName), identifier("getBody")),
         ]);
 
     const discardResponseType = (expression: Expression) =>
-        callExpression(memberExpression(expression, identifier('then')), [
-            memberExpression(identifier(commonHttpClientImportName), identifier('discardResult'))
+        callExpression(memberExpression(expression, identifier("then")), [
+            memberExpression(identifier(commonHttpClientImportName), identifier("discardResult")),
         ]);
 
-    const applyCreatedResultTypeShortcut = (keyCreated: string, keyOther: string) => (expression: Expression) =>
-        callExpression(memberExpression(expression, identifier('then')), [
-            callExpression(memberExpression(identifier(commonHttpClientImportName), identifier('asCreatedResponse')), [
-                stringLiteral(keyCreated),
-                ...(keyCreated === keyOther ? [] : [stringLiteral(keyOther)])
-            ])
-        ]);
+    const applyCreatedResultTypeShortcut =
+        (keyCreated: string, keyOther: string) => (expression: Expression) =>
+            callExpression(memberExpression(expression, identifier("then")), [
+                callExpression(
+                    memberExpression(
+                        identifier(commonHttpClientImportName),
+                        identifier("asCreatedResponse"),
+                    ),
+                    [
+                        stringLiteral(keyCreated),
+                        ...(keyCreated === keyOther ? [] : [stringLiteral(keyOther)]),
+                    ],
+                ),
+            ]);
 
     const castResponseType = (responseType: TSType) => (expression: Expression) =>
-        callExpression(
-            memberExpression(expression, identifier('then')),
-            [
-                callExpression(
-                    memberExpression(identifier(commonHttpClientImportName), identifier('castResponse')),
-                    [],
-                    tsTypeParameterInstantiation([responseType])
-                )
-            ]
-        );
-
-    const responseHandler = (mediaTypesDistribution: MediaTypesDistribution) => (expression: Expression) =>
-        callExpression(memberExpression(expression, identifier('then')), [
+        callExpression(memberExpression(expression, identifier("then")), [
             callExpression(
                 memberExpression(
-                    callExpression(memberExpression(thisExpression(), identifier('getClientInstance')), []),
-                    identifier('responseHandler')
+                    identifier(commonHttpClientImportName),
+                    identifier("castResponse"),
                 ),
-                [
-                    objectExpression(
-                        Object.entries(mediaTypesDistribution).map(([status, mediaTypes]) =>
-                            objectProperty(
-                                numericLiteral(parseInt(status, 10)),
-                                objectExpression(
-                                    Object.entries(mediaTypes).map(([mediaType, bodyType]) =>
-                                        objectProperty(stringLiteral(mediaType), stringLiteral(bodyType))
-                                    )
-                                )
-                            )
-                        )
-                    )
-                ]
-            )
+                [],
+                tsTypeParameterInstantiation([responseType]),
+            ),
         ]);
+
+    const responseHandler =
+        (mediaTypesDistribution: MediaTypesDistribution) => (expression: Expression) =>
+            callExpression(memberExpression(expression, identifier("then")), [
+                callExpression(
+                    memberExpression(
+                        callExpression(
+                            memberExpression(thisExpression(), identifier("getClientInstance")),
+                            [],
+                        ),
+                        identifier("responseHandler"),
+                    ),
+                    [
+                        objectExpression(
+                            Object.entries(mediaTypesDistribution).map(([status, mediaTypes]) =>
+                                objectProperty(
+                                    numericLiteral(parseInt(status, 10)),
+                                    objectExpression(
+                                        Object.entries(mediaTypes).map(([mediaType, bodyType]) =>
+                                            objectProperty(
+                                                stringLiteral(mediaType),
+                                                stringLiteral(bodyType),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ],
+                ),
+            ]);
 
     if (!operation.responses) {
         return {
             type: tsVoidKeyword(),
             dependencyImports: {},
-            suggestedDescription: '',
-            wrapResultExpression: discardResponseType
+            suggestedDescription: "",
+            wrapResultExpression: discardResponseType,
         };
     }
     const successfulResponses: {
@@ -116,14 +153,14 @@ export function getOperationReturnType({
     const dependencyImports: DependencyImports = {};
     const mediaTypesDistribution: MediaTypesDistribution = {};
     for (const [status, response] of Object.entries(operation.responses ?? [])) {
-        if (status.charAt(0) === '2') {
+        if (status.charAt(0) === "2") {
             statuses[status] = true;
             mediaTypesDistribution[status] = {};
             for (const [mediaTypeString, mediaType] of Object.entries(response.content ?? [])) {
                 mediaTypesDistribution[status][mediaTypeString] = isJsonMediaType(mediaTypeString)
-                    ? 'json'
+                    ? "json"
                     : binaryType;
-                successfulResponses.push({status, mediaTypeString, response, mediaType});
+                successfulResponses.push({ status, mediaTypeString, response, mediaType });
             }
         }
     }
@@ -131,21 +168,22 @@ export function getOperationReturnType({
         return {
             type: tsVoidKeyword(),
             dependencyImports: {},
-            suggestedDescription: '',
-            wrapResultExpression: discardResponseType
+            suggestedDescription: "",
+            wrapResultExpression: discardResponseType,
         };
     }
     const resultTypes: TSType[] = [];
     const suggestedDescriptionFragments: string[] = [];
     const responseTypes: TSType[] = [];
 
-    const useAsCreatedResponseShortcut = successfulResponses.length === 2 && statuses[200] && statuses[201];
-    let keyCreated = 'body';
-    let keyOther = 'other';
+    const useAsCreatedResponseShortcut =
+        successfulResponses.length === 2 && statuses[200] && statuses[201];
+    let keyCreated = "body";
+    let keyOther = "other";
 
     const getBinaryType = () => tsTypeReference(identifier(ucFirst(binaryType)));
 
-    for (const {status, mediaTypeString, mediaType, response} of successfulResponses) {
+    for (const { status, mediaTypeString, mediaType, response } of successfulResponses) {
         let schemaType: TSType;
         if (isJsonMediaType(mediaTypeString)) {
             if (mediaType.schema !== undefined) {
@@ -154,36 +192,42 @@ export function getOperationReturnType({
                         schema: mediaType.schema,
                         sourceImportPath: operationImportPath,
                         getModelData,
-                        getBinaryType
+                        getBinaryType,
                     }),
-                    dependencyImports
+                    dependencyImports,
                 );
             } else {
                 schemaType = tsUnknownKeyword();
             }
         } else {
-            schemaType = tsTypeReference(identifier('Blob'));
+            schemaType = tsTypeReference(identifier("Blob"));
         }
-        if (status === '204') {
+        if (status === "204") {
             schemaType = tsVoidKeyword();
         }
-        const jsdocString = renderJsDocAsPlainText(extractJsDoc({...response, ...mediaType}));
+        const jsdocString = renderJsDocAsPlainText(extractJsDoc({ ...response, ...mediaType }));
         const responseOption = tsTypeLiteral([
-            tsPropertySignature(identifier('status'), tsTypeAnnotation(tsLiteralType(numericLiteral(parseInt(status, 10))))),
-            tsPropertySignature(identifier('mediaType'), tsTypeAnnotation(tsLiteralType(stringLiteral(mediaTypeString)))),
-            tsPropertySignature(identifier('body'), tsTypeAnnotation(schemaType))
+            tsPropertySignature(
+                identifier("status"),
+                tsTypeAnnotation(tsLiteralType(numericLiteral(parseInt(status, 10)))),
+            ),
+            tsPropertySignature(
+                identifier("mediaType"),
+                tsTypeAnnotation(tsLiteralType(stringLiteral(mediaTypeString))),
+            ),
+            tsPropertySignature(identifier("body"), tsTypeAnnotation(schemaType)),
         ]);
         responseTypes.push(responseOption);
         if (successfulResponses.length > 1) {
             suggestedDescriptionFragments.push(
-                `status: ${status}, mediaType: ${mediaTypeString}${jsdocString ? `\n\n${jsdocString}` : ''}`
+                `status: ${status}, mediaType: ${mediaTypeString}${jsdocString ? `\n\n${jsdocString}` : ""}`,
             );
             if (useAsCreatedResponseShortcut) {
                 const fieldName = applyEntityNameCase(
-                    getUserFreiendlySchemaName(mediaType.schema) ?? 'body',
-                    'camelCase'
+                    getUserFreiendlySchemaName(mediaType.schema) ?? "body",
+                    "camelCase",
                 );
-                const created = status === '201';
+                const created = status === "201";
                 if (created) {
                     keyCreated = fieldName;
                 } else {
@@ -192,11 +236,11 @@ export function getOperationReturnType({
                 resultTypes.push(
                     tsTypeLiteral([
                         tsPropertySignature(
-                            identifier('created'),
-                            tsTypeAnnotation(tsLiteralType(booleanLiteral(created)))
+                            identifier("created"),
+                            tsTypeAnnotation(tsLiteralType(booleanLiteral(created))),
                         ),
-                        tsPropertySignature(identifier(fieldName), tsTypeAnnotation(schemaType))
-                    ])
+                        tsPropertySignature(identifier(fieldName), tsTypeAnnotation(schemaType)),
+                    ]),
                 );
             } else {
                 resultTypes.push(responseOption);
@@ -205,12 +249,12 @@ export function getOperationReturnType({
             return {
                 type: schemaType,
                 dependencyImports,
-                suggestedDescription: jsdocString ?? '',
+                suggestedDescription: jsdocString ?? "",
                 wrapResultExpression: combineResultWrappers([
                     responseHandler(mediaTypesDistribution),
                     castResponseType(tsUnionType(responseTypes)),
-                    getResponseBody
-                ])
+                    getResponseBody,
+                ]),
             };
         }
     }
@@ -222,17 +266,20 @@ export function getOperationReturnType({
         type: useAsCreatedResponseShortcut
             ? simplifiedResultType
             : tsTypeReference(
-                  tsQualifiedName(identifier(commonHttpClientImportName), identifier('WithResponse')),
-                  tsTypeParameterInstantiation([simplifiedResultType])
+                  tsQualifiedName(
+                      identifier(commonHttpClientImportName),
+                      identifier("WithResponse"),
+                  ),
+                  tsTypeParameterInstantiation([simplifiedResultType]),
               ),
         dependencyImports,
-        suggestedDescription: '\n' + renderJsDocList(suggestedDescriptionFragments),
+        suggestedDescription: "\n" + renderJsDocList(suggestedDescriptionFragments),
         wrapResultExpression: combineResultWrappers([
             responseHandler(mediaTypesDistribution),
             castResponseType(simplifiedResponseType),
             useAsCreatedResponseShortcut
                 ? applyCreatedResultTypeShortcut(keyCreated, keyOther)
-                : (expression) => expression
-        ])
+                : (expression) => expression,
+        ]),
     };
 }

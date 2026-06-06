@@ -1,15 +1,27 @@
-import type { OpenApiSchemaFieldPathItem } from './common.ts';
-import {generateClient} from './common/client.ts';
-import {generateCommonHttpClient, generateCommonHttpService} from './common/client-core.ts';
-import {generateModels} from './common/models.ts';
-import { generateServices } from './common/services.ts';
-import type { GeneratedServices } from './common/services.ts';
-import type { ClientGenerationResult, ClientGenerationResultFile, CommonOpenApiClientGeneratorConfig } from './config.ts';
-import type { OpenApiInfo, OpenApiParameter, OpenApiSchema } from '../schemas/common.ts';
-import type { OpenApiDocument, OpenApiMediaType, OpenApiOperation, OpenApiPathItem, OpenApiPaths, OpenApiRequestBody, OpenApiTag } from '../schemas/openapi.ts';
-import type { JsDocBlock } from '../utils/jsdoc.ts';
-import type { FilenameFormat } from '../utils/string-utils.ts';
-import {extractTags} from '../utils/tags.ts';
+import type { OpenApiSchemaFieldPathItem } from "./common.ts";
+import { generateClient } from "./common/client.ts";
+import { generateCommonHttpClient, generateCommonHttpService } from "./common/client-core.ts";
+import { generateModels } from "./common/models.ts";
+import { generateServices } from "./common/services.ts";
+import type { GeneratedServices } from "./common/services.ts";
+import type {
+    ClientGenerationResult,
+    ClientGenerationResultFile,
+    CommonOpenApiClientGeneratorConfig,
+} from "./config.ts";
+import type { OpenApiInfo, OpenApiParameter, OpenApiSchema } from "../schemas/common.ts";
+import type {
+    OpenApiDocument,
+    OpenApiMediaType,
+    OpenApiOperation,
+    OpenApiPathItem,
+    OpenApiPaths,
+    OpenApiRequestBody,
+    OpenApiTag,
+} from "../schemas/openapi.ts";
+import type { JsDocBlock } from "../utils/jsdoc.ts";
+import type { FilenameFormat } from "../utils/string-utils.ts";
+import { extractTags } from "../utils/tags.ts";
 
 /**
  * Callback for generating the JSDoc of a service.
@@ -549,7 +561,7 @@ export type GenerateCoreJsDoc = (params: {
 /**
  * What needs to be imported from the external source.
  */
-export type OpenApiClientExternalValueSourceImportEntity = {name: string} | 'default';
+export type OpenApiClientExternalValueSourceImportEntity = { name: string } | "default";
 
 /**
  * Custom value source for the OpenAPI client generation customization.
@@ -600,7 +612,7 @@ export type OpenApiClientBuiltinBinaryType =
      *
      * @see https://developer.mozilla.org/en-US/docs/Web/API/Blob
      */
-    | 'blob'
+    | "blob"
     /**
      * Standard readable stream of binary data.
      *
@@ -608,12 +620,14 @@ export type OpenApiClientBuiltinBinaryType =
      *
      * @see https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream
      */
-    | 'readableStream';
+    | "readableStream";
 
 /**
  * Customizable binary type for the OpenAPI client generation.
  */
-export type OpenApiClientCustomizableBinaryType = OpenApiClientBuiltinBinaryType | OpenApiClientExternalType;
+export type OpenApiClientCustomizableBinaryType =
+    | OpenApiClientBuiltinBinaryType
+    | OpenApiClientExternalType;
 
 /**
  * Configuration for generating operation calls.
@@ -710,8 +724,8 @@ export interface OpenApiClientGeneratorConfigClient {
      * @default 'all'
      */
     includeServices?:
-        | 'all'
-        | 'none'
+        | "all"
+        | "none"
         | {
               tags: string[];
           };
@@ -721,8 +735,8 @@ export interface OpenApiClientGeneratorConfigClient {
      * @default 'none'
      */
     exportServices?:
-        | 'all'
-        | 'none'
+        | "all"
+        | "none"
         | {
               services: string[];
           };
@@ -732,8 +746,8 @@ export interface OpenApiClientGeneratorConfigClient {
      * @default 'none'
      */
     exportModels?:
-        | 'all'
-        | 'none'
+        | "all"
+        | "none"
         | {
               /**
                * Model names to be exported.
@@ -915,7 +929,7 @@ export interface OpenApiClientGeneratorConfigComments {
  * Configuration for generating an OpenAPI client.
  */
 export interface OpenApiClientGeneratorConfig extends CommonOpenApiClientGeneratorConfig {
-    type: 'openapiClient';
+    type: "openapiClient";
     /**
      * Configuration for generating operation calls.
      */
@@ -956,7 +970,7 @@ export interface OpenApiClientGeneratorConfig extends CommonOpenApiClientGenerat
 
 export async function openapiToTypescriptClient({
     document,
-    generateConfig
+    generateConfig,
 }: {
     document: OpenApiDocument;
     generateConfig: OpenApiClientGeneratorConfig;
@@ -964,22 +978,22 @@ export async function openapiToTypescriptClient({
     const extractedTags =
         generateConfig.services !== false
             ? extractTags(document)
-            : {taggedPaths: {}, rest: {...document.paths}, tags: {}};
+            : { taggedPaths: {}, rest: { ...document.paths }, tags: {} };
 
     const files: ClientGenerationResultFile[] = [];
     const [commonHttpClient, commonHttpService] = await Promise.all([
         generateCommonHttpClient(generateConfig.core, generateConfig.comments ?? {}),
-        generateCommonHttpService(generateConfig.core, generateConfig.comments ?? {})
+        generateCommonHttpService(generateConfig.core, generateConfig.comments ?? {}),
     ]);
 
-    const binaryTypes = generateConfig.binaryTypes ?? ['blob', 'readableStream'];
+    const binaryTypes = generateConfig.binaryTypes ?? ["blob", "readableStream"];
 
     const generatedModels = generateModels({
         extractedTags,
         modelsConfig: generateConfig.models,
         binaryTypes,
         jsDocRenderConfig: generateConfig.jsDoc,
-        commentsConfig: generateConfig.comments ?? {}
+        commentsConfig: generateConfig.comments ?? {},
     });
 
     files.push(commonHttpClient.file, commonHttpService.file);
@@ -1006,7 +1020,7 @@ export async function openapiToTypescriptClient({
             getModelData,
             binaryTypes,
             jsDocRenderConfig: generateConfig.jsDoc,
-            commentsConfig: generateConfig.comments ?? {}
+            commentsConfig: generateConfig.comments ?? {},
         });
         files.push(...generatedServices.files);
     }
@@ -1028,14 +1042,14 @@ export async function openapiToTypescriptClient({
                 operationsConfig: generateConfig.operations,
                 getModelData,
                 modelImportInfos: Object.values(generatedModels.modelsIndex),
-                responseBinaryType: generateConfig.operations?.responseBinaryType ?? 'blob',
+                responseBinaryType: generateConfig.operations?.responseBinaryType ?? "blob",
                 binaryTypes,
                 jsDocRenderConfig: generateConfig.jsDoc,
                 commentsConfig: generateConfig.comments ?? {},
-                deprecatedOperations: generatedServices?.deprecatedOperations ?? {}
-            })
+                deprecatedOperations: generatedServices?.deprecatedOperations ?? {},
+            }),
         );
     }
 
-    return {files};
+    return { files };
 }

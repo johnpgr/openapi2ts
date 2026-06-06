@@ -1,24 +1,45 @@
-import path from 'path';
-import { exportNamedDeclaration, identifier, isTSIndexSignature, isTSIntersectionType, isTSTypeLiteral, program, tsExpressionWithTypeArguments, tsInterfaceBody, tsInterfaceDeclaration, tsTypeAliasDeclaration, tsTypeParameterInstantiation, tsTypeReference } from '../../emit/index.ts';
-import type { ExportNamedDeclaration, TSType } from '../../emit/index.ts';
-import ts from 'typescript';
-import {groupBy} from '../../utils/collections.ts';
-import {createBinaryTypeGetter} from './binary.ts';
-import type { OpenApiSchema } from '../../schemas/common.ts';
-import { openApiHttpMethods } from '../../schemas/openapi.ts';
-import type { OpenApiPaths } from '../../schemas/openapi.ts';
-import { addDependencyImport, collectSchemaDependencies, extendDependenciesAndGetResult, generateTsImports } from '../../utils/dependencies.ts';
-import type { DependencyImports } from '../../utils/dependencies.ts';
-import { resolveJsDocWithHook, resolveWithHook } from '../../utils/hooks.ts';
-import { attachJsDocComment, extractJsDoc, renderJsDoc } from '../../utils/jsdoc.ts';
-import type { JsDocRenderConfig } from '../../utils/jsdoc.ts';
-import {getRelativeImportPath} from '../../utils/paths.ts';
-import {applyEntityNameCase, formatFilename} from '../../utils/string-utils.ts';
-import type { ExtractedTags } from '../../utils/tags.ts';
-import { generateSchemaType, renderTypeScript } from '../common.ts';
-import type { CommentsRenderConfig, OpenApiSchemaFieldPathItem } from '../common.ts';
-import type { ClientGenerationResultFile } from '../config.ts';
-import type { GenerateModelJsDoc, OpenApiClientCustomizableBinaryType, OpenApiClientGeneratorConfig } from '../openapi-to-typescript-client.ts';
+import path from "path";
+import {
+    exportNamedDeclaration,
+    identifier,
+    isTSIndexSignature,
+    isTSIntersectionType,
+    isTSTypeLiteral,
+    program,
+    tsExpressionWithTypeArguments,
+    tsInterfaceBody,
+    tsInterfaceDeclaration,
+    tsTypeAliasDeclaration,
+    tsTypeParameterInstantiation,
+} from "../../emit/index.ts";
+import type { ExportNamedDeclaration, TSType } from "../../emit/index.ts";
+import ts from "typescript";
+import { groupBy } from "../../utils/collections.ts";
+import { createBinaryTypeGetter } from "./binary.ts";
+import type { OpenApiSchema } from "../../schemas/common.ts";
+import { openApiHttpMethods } from "../../schemas/openapi.ts";
+import type { OpenApiPaths } from "../../schemas/openapi.ts";
+import {
+    addDependencyImport,
+    collectSchemaDependencies,
+    extendDependenciesAndGetResult,
+    generateTsImports,
+} from "../../utils/dependencies.ts";
+import type { DependencyImports } from "../../utils/dependencies.ts";
+import { resolveJsDocWithHook, resolveWithHook } from "../../utils/hooks.ts";
+import { attachJsDocComment, extractJsDoc, renderJsDoc } from "../../utils/jsdoc.ts";
+import type { JsDocRenderConfig } from "../../utils/jsdoc.ts";
+import { getRelativeImportPath } from "../../utils/paths.ts";
+import { applyEntityNameCase, formatFilename } from "../../utils/string-utils.ts";
+import type { ExtractedTags } from "../../utils/tags.ts";
+import { generateSchemaType, renderTypeScript } from "../common.ts";
+import type { CommentsRenderConfig, OpenApiSchemaFieldPathItem } from "../common.ts";
+import type { ClientGenerationResultFile } from "../config.ts";
+import type {
+    GenerateModelJsDoc,
+    OpenApiClientCustomizableBinaryType,
+    OpenApiClientGeneratorConfig,
+} from "../openapi-to-typescript-client.ts";
 
 export interface ModelImportInfo {
     modelName: string;
@@ -63,7 +84,7 @@ function generateTypeExport({
     generateJsDoc,
     binaryTypes,
     importPath,
-    jsDocRenderConfig
+    jsDocRenderConfig,
 }: {
     modelName: string;
     schemaName: string;
@@ -83,29 +104,41 @@ function generateTypeExport({
         processJsDoc:
             generateJsDoc &&
             ((jsdoc, schemaEntity, fieldPath: OpenApiSchemaFieldPathItem[]) =>
-                resolveJsDocWithHook(jsdoc, generateJsDoc, {schema: schemaEntity, schemaName, fieldPath}))
+                resolveJsDocWithHook(jsdoc, generateJsDoc, {
+                    schema: schemaEntity,
+                    schemaName,
+                    fieldPath,
+                })),
     });
 
     const jsdoc = resolveJsDocWithHook(extractJsDoc(schema), generateJsDoc, {
         schemaName,
         fieldPath: [],
-        schema
+        schema,
     });
     return {
         result: attachJsDocComment(
             exportNamedDeclaration(createModelDeclaration(modelName, schemaType)),
-            renderJsDoc(jsdoc, jsDocRenderConfig)
+            renderJsDoc(jsdoc, jsDocRenderConfig),
         ),
-        dependencyImports
+        dependencyImports,
     };
 }
 
 function createModelDeclaration(modelName: string, schemaType: TSType) {
     if (isTSTypeLiteral(schemaType)) {
         const typeLiteral = schemaType as TypeLiteralLike;
-        return tsInterfaceDeclaration(identifier(modelName), null, null, tsInterfaceBody(typeLiteral.members));
+        return tsInterfaceDeclaration(
+            identifier(modelName),
+            null,
+            null,
+            tsInterfaceBody(typeLiteral.members),
+        );
     }
-    return createRecordInterfaceDeclaration(modelName, schemaType) ?? tsTypeAliasDeclaration(identifier(modelName), null, schemaType);
+    return (
+        createRecordInterfaceDeclaration(modelName, schemaType) ??
+        tsTypeAliasDeclaration(identifier(modelName), null, schemaType)
+    );
 }
 
 function createRecordInterfaceDeclaration(modelName: string, schemaType: TSType) {
@@ -136,19 +169,19 @@ function createRecordInterfaceDeclaration(modelName: string, schemaType: TSType)
         [
             ts.factory.createHeritageClause(ts.SyntaxKind.ExtendsKeyword, [
                 tsExpressionWithTypeArguments(
-                    identifier('Record'),
+                    identifier("Record"),
                     tsTypeParameterInstantiation([
                         additionalPropertiesMember.parameters[0].type!,
-                        additionalPropertiesMember.type
-                    ])
-                )
-            ])
+                        additionalPropertiesMember.type,
+                    ]),
+                ),
+            ]),
         ],
-        tsInterfaceBody(interfaceType.members)
+        tsInterfaceBody(interfaceType.members),
     );
 }
 
-export const defaultModelsRelativeDirPath = 'models';
+export const defaultModelsRelativeDirPath = "models";
 
 function collectOperationSchemas(paths: OpenApiPaths) {
     const schemas: OpenApiSchema[] = [];
@@ -180,7 +213,11 @@ function collectOperationSchemas(paths: OpenApiPaths) {
     return schemas;
 }
 
-function collectSchemaInfoForTag(tagName: string, paths: OpenApiPaths, schemaInfos: Record<string, SchemaInfo>) {
+function collectSchemaInfoForTag(
+    tagName: string,
+    paths: OpenApiPaths,
+    schemaInfos: Record<string, SchemaInfo>,
+) {
     function collectDependenciesFor(name: string, schema: OpenApiSchema) {
         if (schemaInfos[name]) {
             schemaInfos[name].tagNames.add(tagName);
@@ -189,7 +226,7 @@ function collectSchemaInfoForTag(tagName: string, paths: OpenApiPaths, schemaInf
         schemaInfos[name] = {
             dependencies: [],
             tagNames: new Set([tagName]),
-            schema
+            schema,
         };
         for (const [depName, depSchema] of Object.entries(collectSchemaDependencies(schema))) {
             schemaInfos[name].dependencies.push(depName);
@@ -197,7 +234,9 @@ function collectSchemaInfoForTag(tagName: string, paths: OpenApiPaths, schemaInf
         }
     }
 
-    for (const [name, schema] of Object.entries(collectSchemaDependencies({oneOf: collectOperationSchemas(paths)}))) {
+    for (const [name, schema] of Object.entries(
+        collectSchemaDependencies({ oneOf: collectOperationSchemas(paths) }),
+    )) {
         collectDependenciesFor(name, schema);
     }
 }
@@ -205,7 +244,7 @@ function collectSchemaInfoForTag(tagName: string, paths: OpenApiPaths, schemaInf
 function buildFinalSchemaInfos({
     schemaInfos,
     defaultScope,
-    getModelName
+    getModelName,
 }: {
     schemaInfos: Record<string, SchemaInfo>;
     defaultScope: string;
@@ -213,14 +252,14 @@ function buildFinalSchemaInfos({
 }) {
     const finalSchemaInfos: Record<string, FinalSchemaInfo> = {};
 
-    for (const [schemaName, {dependencies, tagNames, schema}] of Object.entries(schemaInfos)) {
+    for (const [schemaName, { dependencies, tagNames, schema }] of Object.entries(schemaInfos)) {
         const scope: string = tagNames.size > 1 ? defaultScope : tagNames.values().next().value!;
         finalSchemaInfos[schemaName] = {
             schemaName,
             modelName: getModelName(schemaName),
             dependencies,
             schema,
-            scope
+            scope,
         };
     }
 
@@ -234,14 +273,14 @@ function addModelDependencyImports({
     filename,
     relativeDirPath,
     filenameFormat,
-    dependencyImports
+    dependencyImports,
 }: {
     dependencies: string[];
     finalSchemaInfos: Record<string, FinalSchemaInfo>;
     scope: string;
     filename: string;
     relativeDirPath: string;
-    filenameFormat: NonNullable<OpenApiClientGeneratorConfig['models']>['filenameFormat'];
+    filenameFormat: NonNullable<OpenApiClientGeneratorConfig["models"]>["filenameFormat"];
     dependencyImports: DependencyImports;
 }) {
     for (const dependency of dependencies) {
@@ -251,11 +290,11 @@ function addModelDependencyImports({
         }
         const depPath = getRelativeImportPath(
             filename,
-            path.join(relativeDirPath, formatFilename(depInfo.scope, filenameFormat))
+            path.join(relativeDirPath, formatFilename(depInfo.scope, filenameFormat)),
         );
         addDependencyImport(dependencyImports, depPath, depInfo.modelName, {
-            kind: 'type',
-            entity: {name: depInfo.modelName}
+            kind: "type",
+            entity: { name: depInfo.modelName },
         });
     }
 }
@@ -265,16 +304,16 @@ export function generateModels({
     modelsConfig: {
         filenameFormat,
         relativeDirPath = defaultModelsRelativeDirPath,
-        defaultScope = 'common',
+        defaultScope = "common",
         generateName,
-        generateJsDoc
+        generateJsDoc,
     } = {},
     binaryTypes,
     jsDocRenderConfig,
-    commentsConfig
+    commentsConfig,
 }: {
     extractedTags: ExtractedTags;
-    modelsConfig: OpenApiClientGeneratorConfig['models'];
+    modelsConfig: OpenApiClientGeneratorConfig["models"];
     binaryTypes: OpenApiClientCustomizableBinaryType[];
     jsDocRenderConfig: JsDocRenderConfig;
     commentsConfig: CommentsRenderConfig;
@@ -289,25 +328,29 @@ export function generateModels({
     }
 
     function getModelName(schemaName: string) {
-        const suggestedName = applyEntityNameCase(schemaName, 'pascalCase');
-        return resolveWithHook(suggestedName, generateName, {suggestedName, schemaName});
+        const suggestedName = applyEntityNameCase(schemaName, "pascalCase");
+        return resolveWithHook(suggestedName, generateName, { suggestedName, schemaName });
     }
 
     collectSchemaInfoForTag(defaultScope, extractedTags.rest, schemaInfos);
 
-    const finalSchemaInfos = buildFinalSchemaInfos({schemaInfos, defaultScope, getModelName});
+    const finalSchemaInfos = buildFinalSchemaInfos({ schemaInfos, defaultScope, getModelName });
 
     const schemasByScopes = groupBy(
         Object.values(finalSchemaInfos).sort((a, b) => a.modelName.localeCompare(b.modelName)),
-        ({scope}) => scope
+        ({ scope }) => scope,
     );
 
     for (const [scope, fileSchemaInfos] of Object.entries(schemasByScopes)) {
-        const filename = path.join('.', relativeDirPath, formatFilename(scope, {...filenameFormat, extension: '.ts'}));
+        const filename = path.join(
+            ".",
+            relativeDirPath,
+            formatFilename(scope, { ...filenameFormat, extension: ".ts" }),
+        );
         const dependencyImports: DependencyImports = {};
         const exports: ExportNamedDeclaration[] = [];
         const importPath = path.join(relativeDirPath, formatFilename(scope, filenameFormat));
-        for (const {dependencies, modelName, schemaName, schema} of fileSchemaInfos) {
+        for (const { dependencies, modelName, schemaName, schema } of fileSchemaInfos) {
             addModelDependencyImports({
                 dependencies,
                 finalSchemaInfos,
@@ -315,7 +358,7 @@ export function generateModels({
                 filename,
                 relativeDirPath,
                 filenameFormat,
-                dependencyImports
+                dependencyImports,
             });
             exports.push(
                 extendDependenciesAndGetResult(
@@ -327,22 +370,25 @@ export function generateModels({
                         generateJsDoc,
                         binaryTypes,
                         importPath,
-                        jsDocRenderConfig
+                        jsDocRenderConfig,
                     }),
-                    dependencyImports
-                )
+                    dependencyImports,
+                ),
             );
             modelsIndex[schemaName] = {
                 modelName,
                 schemaName,
-                importPath
+                importPath,
             };
         }
         files.push({
             filename,
-            data: renderTypeScript(program([...generateTsImports(dependencyImports), ...exports]), commentsConfig)
+            data: renderTypeScript(
+                program([...generateTsImports(dependencyImports), ...exports]),
+                commentsConfig,
+            ),
         });
     }
 
-    return {files, modelsIndex};
+    return { files, modelsIndex };
 }

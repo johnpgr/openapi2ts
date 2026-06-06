@@ -1,27 +1,27 @@
-import type { OpenApiSchema } from '../schemas/common.ts';
+import type { OpenApiSchema } from "../schemas/common.ts";
 
 /**
  * Sometimes schemas have unnecessary properties that can be removed to make the schema cleaner.
  */
 export function cleanupSchema(schema: OpenApiSchema): OpenApiSchema {
-    if (typeof schema === 'boolean') {
+    if (typeof schema === "boolean") {
         return schema;
     }
-    if ('enum' in schema && schema.enum) {
-        const {enum: enumValues, ...rest} = schema;
+    if ("enum" in schema && schema.enum) {
+        const { enum: enumValues, ...rest } = schema;
         if (enumValues.length === 0) {
             return rest;
         }
         if (enumValues.length === 1) {
             return {
                 ...rest,
-                const: enumValues[0]
+                const: enumValues[0],
             };
         }
-        if (enumValues.length === 2 && enumValues.every((v) => typeof v === 'boolean')) {
+        if (enumValues.length === 2 && enumValues.every((v) => typeof v === "boolean")) {
             return {
                 ...rest,
-                type: 'boolean'
+                type: "boolean",
             };
         }
     }

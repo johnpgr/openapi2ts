@@ -1,52 +1,52 @@
 {
-  "name": "openapi2ts",
-  "version": "0.1.0",
-  "description": "Zero-dependency OpenAPI to TypeScript client generator (Node 24+, JSON only). Ships raw TypeScript — no build step.",
-  "license": "MIT",
-  "type": "module",
-  "engines": {
-    "node": ">=24.0.0"
-  },
-  "dependencies": {},
-  "peerDependencies": {
-    "typescript": ">=6.0.0"
-  },
-  "main": "./src/index.ts",
-  "bin": {
-    "openapi2ts": "./src/cli/index.ts"
-  },
-  "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+    "name": "openapi2ts",
+    "version": "0.1.0",
+    "description": "Zero-dependency OpenAPI to TypeScript client generator (Node 24+, JSON only). Ships raw TypeScript — no build step.",
+    "license": "MIT",
+    "bin": {
+        "openapi2ts": "./src/cli/index.ts"
     },
-    "./openapi": {
-      "types": "./src/openapi.ts",
-      "default": "./src/openapi.ts"
+    "files": [
+        "src",
+        "index.d.ts",
+        "openapi.d.ts",
+        "openapi-client.d.ts",
+        "LICENSE",
+        "README.md"
+    ],
+    "type": "module",
+    "main": "./src/index.ts",
+    "exports": {
+        ".": {
+            "types": "./src/index.ts",
+            "default": "./src/index.ts"
+        },
+        "./openapi": {
+            "types": "./src/openapi.ts",
+            "default": "./src/openapi.ts"
+        },
+        "./openapi-client": {
+            "types": "./src/openapi-client.ts",
+            "default": "./src/openapi-client.ts"
+        }
     },
-    "./openapi-client": {
-      "types": "./src/openapi-client.ts",
-      "default": "./src/openapi-client.ts"
+    "scripts": {
+        "generate": "node src/cli/index.ts generate",
+        "check": "node src/cli/index.ts check",
+        "test": "node --test test/node/*.test.ts",
+        "lint": "tsc --noEmit",
+        "test:update": "node src/cli/index.ts generate test/snapshot-config.ts",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {},
+    "devDependencies": {
+        "@types/node": "^24.0.0",
+        "typescript": "^6.0.0"
+    },
+    "peerDependencies": {
+        "typescript": ">=6.0.0"
+    },
+    "engines": {
+        "node": ">=24.0.0"
     }
-  },
-  "files": [
-    "src",
-    "index.d.ts",
-    "openapi.d.ts",
-    "openapi-client.d.ts",
-    "LICENSE",
-    "README.md"
-  ],
-  "scripts": {
-    "generate": "node src/cli/index.ts generate",
-    "check": "node src/cli/index.ts check",
-    "test": "node --test test/node/*.test.ts",
-    "lint": "tsc --noEmit",
-    "test:update": "node src/cli/index.ts generate test/snapshot-config.ts",
-    "typecheck": "tsc --noEmit"
-  },
-  "devDependencies": {
-    "@types/node": "^24.0.0",
-    "typescript": "^6.0.0"
-  }
 }

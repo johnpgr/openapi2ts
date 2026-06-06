@@ -1,39 +1,39 @@
 /**
  * JSON Schema primitive types.
  */
-export type OpenApiPrimitiveTypes = 'null' | 'number' | 'integer' | 'string' | 'boolean';
+export type OpenApiPrimitiveTypes = "null" | "number" | "integer" | "string" | "boolean";
 
 /**
  * Available JSON Schema formats.
  */
 export type OpenApiFormats =
-    | 'int32'
-    | 'int64'
-    | 'float'
-    | 'double'
-    | 'byte'
-    | 'binary'
-    | 'date'
-    | 'date-time'
-    | 'password'
-    | 'email';
+    | "int32"
+    | "int64"
+    | "float"
+    | "double"
+    | "byte"
+    | "binary"
+    | "date"
+    | "date-time"
+    | "password"
+    | "email";
 
 /**
  * The type of serialization to use for the parameter.
  */
 export type OpenApiParameterStyle =
-    | 'matrix'
-    | 'label'
-    | 'form'
-    | 'simple'
-    | 'spaceDelimited'
-    | 'pipeDelimited'
-    | 'deepObject';
+    | "matrix"
+    | "label"
+    | "form"
+    | "simple"
+    | "spaceDelimited"
+    | "pipeDelimited"
+    | "deepObject";
 
 /**
  * Parameter locations.
  */
-export type OpenApiParameterIn = 'query' | 'header' | 'path' | 'cookie';
+export type OpenApiParameterIn = "query" | "header" | "path" | "cookie";
 
 /**
  * Describes a single operation parameter. A unique parameter is defined by a combination of a name and location.
@@ -284,7 +284,7 @@ export type OpenApiSchema = true | false | OpenApiExpandedSchema;
  */
 export interface OpenApiExpandedSchema {
     nullable?: boolean;
-    type?: OpenApiPrimitiveTypes | OpenApiPrimitiveTypes[] | 'object' | 'array';
+    type?: OpenApiPrimitiveTypes | OpenApiPrimitiveTypes[] | "object" | "array";
     format?: OpenApiFormats;
 
     // --- string ---
@@ -543,19 +543,25 @@ export function extendSchema(base: OpenApiSchema, extension: OpenApiSchema): Ope
     }
     const result = Object.assign({}, base, extension);
     if (base.properties && extension.properties) {
-        result.properties = {...base.properties, ...extension.properties};
+        result.properties = { ...base.properties, ...extension.properties };
     }
     if (base.required && extension.required) {
         result.required = base.required.concat(extension.required);
     }
     if (base.additionalProperties && extension.additionalProperties) {
-        result.additionalProperties = extendSchema(base.additionalProperties, extension.additionalProperties);
+        result.additionalProperties = extendSchema(
+            base.additionalProperties,
+            extension.additionalProperties,
+        );
     }
     if (base.examples && extension.examples) {
-        result.examples = {...base.examples, ...extension.examples};
+        result.examples = { ...base.examples, ...extension.examples };
     }
     if (base.externalDocumentation && extension.externalDocumentation) {
-        result.externalDocumentation = {...base.externalDocumentation, ...extension.externalDocumentation};
+        result.externalDocumentation = {
+            ...base.externalDocumentation,
+            ...extension.externalDocumentation,
+        };
     }
     return result;
 }
@@ -569,7 +575,7 @@ export function resolveDocumentReferences<T>(document: T): T {
 
     function queryDocument(path: string): unknown {
         let current = document as unknown;
-        for (const pathBit of path.split('/')) {
+        for (const pathBit of path.split("/")) {
             current = (current as Record<string, unknown>)[pathBit];
             if (current === undefined) {
                 throw new Error(`Could not find schema object by path "${path}".`);
@@ -579,13 +585,15 @@ export function resolveDocumentReferences<T>(document: T): T {
     }
 
     function resolveReferences(obj: unknown): unknown {
-        if (typeof obj !== 'object' || obj === null) {
+        if (typeof obj !== "object" || obj === null) {
             return obj;
         }
         const ref = (obj as Ref).$ref;
         if (ref) {
-            if (!ref.startsWith('#/')) {
-                throw new Error(`Could not resolve reference ${JSON.stringify(ref)}. Only local refs are supported.`);
+            if (!ref.startsWith("#/")) {
+                throw new Error(
+                    `Could not resolve reference ${JSON.stringify(ref)}. Only local refs are supported.`,
+                );
             }
             return queryDocument(ref.slice(2));
         }

@@ -19,7 +19,13 @@ export class PetStoreApiClientError extends commonHttpClient.CommonHttpClientErr
  * @version 1.0.0
  */
 export class PetStoreApiClient extends CommonHttpService {
-    protected client = new commonHttpClient.CommonHttpClient({ apiClientClassName: this.constructor.name ?? "name", baseUrl: "https://petstore.swagger.io/v2", binaryResponseType: "blob", errorClass: PetStoreApiClientError, deprecatedOperations: { "GET /pet/findByTags": "pet.findPetsByTags" } });
+    protected client = new commonHttpClient.CommonHttpClient({
+        apiClientClassName: this.constructor.name ?? "name",
+        baseUrl: "https://petstore.swagger.io/v2",
+        binaryResponseType: "blob",
+        errorClass: PetStoreApiClientError,
+        deprecatedOperations: { "GET /pet/findByTags": "pet.findPetsByTags" },
+    });
     protected getClient = () => this.client;
     /** Everything about your Pets */
     get pet() {

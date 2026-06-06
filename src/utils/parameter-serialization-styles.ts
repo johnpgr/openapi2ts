@@ -1,13 +1,17 @@
-import { objectExpression, objectProperty } from '../emit/index.ts';
-import type { MutableObjectExpression } from '../emit/index.ts';
-import {objectPropertyKey, valueToAstExpression} from '../schema-to-typescript/common.ts';
-import type { OpenApiParameter, OpenApiParameterIn, OpenApiParameterStyle } from '../schemas/common.ts';
+import { objectExpression, objectProperty } from "../emit/index.ts";
+import type { MutableObjectExpression } from "../emit/index.ts";
+import { objectPropertyKey, valueToAstExpression } from "../schema-to-typescript/common.ts";
+import type {
+    OpenApiParameter,
+    OpenApiParameterIn,
+    OpenApiParameterStyle,
+} from "../schemas/common.ts";
 
 const defaultParameterStyles: Record<OpenApiParameterIn, OpenApiParameterStyle> = {
-    query: 'form',
-    cookie: 'form',
-    header: 'simple',
-    path: 'simple'
+    query: "form",
+    cookie: "form",
+    header: "simple",
+    path: "simple",
 };
 
 const defaultParameterExplode: Record<OpenApiParameterStyle, boolean> = {
@@ -17,7 +21,7 @@ const defaultParameterExplode: Record<OpenApiParameterStyle, boolean> = {
     deepObject: true,
     simple: false,
     label: false,
-    matrix: false
+    matrix: false,
 };
 
 type ParameterSerializeInfo =
@@ -33,22 +37,30 @@ type ParameterSerializeInfo =
       };
 
 function getParameterSerializeInfo(parameter: OpenApiParameter): ParameterSerializeInfo | null {
-    const {style = defaultParameterStyles[parameter.in], explode = defaultParameterExplode[style]} = parameter;
+    const {
+        style = defaultParameterStyles[parameter.in],
+        explode = defaultParameterExplode[style],
+    } = parameter;
     if (style !== defaultParameterStyles[parameter.in]) {
         if (explode !== defaultParameterExplode[style]) {
-            return {style, explode};
+            return { style, explode };
         }
-        return {style};
+        return { style };
     }
     if (explode !== defaultParameterExplode[style]) {
-        return {explode};
+        return { explode };
     }
     return null;
 }
 
-export function buildParametersSerializationInfo(parameters: OpenApiParameter[]): MutableObjectExpression | null {
+export function buildParametersSerializationInfo(
+    parameters: OpenApiParameter[],
+): MutableObjectExpression | null {
     const parameterInfoByLocation = parameters.reduce(
-        (acc: {[K in OpenApiParameterIn]?: {name: string; info: ParameterSerializeInfo}[]}, parameter) => {
+        (
+            acc: { [K in OpenApiParameterIn]?: { name: string; info: ParameterSerializeInfo }[] },
+            parameter,
+        ) => {
             const serializeInfo = getParameterSerializeInfo(parameter);
             if (!serializeInfo) {
                 return acc;
@@ -57,10 +69,10 @@ export function buildParametersSerializationInfo(parameters: OpenApiParameter[])
             if (!paramsInLocation) {
                 paramsInLocation = acc[parameter.in] = [];
             }
-            paramsInLocation.push({name: parameter.name, info: serializeInfo});
+            paramsInLocation.push({ name: parameter.name, info: serializeInfo });
             return acc;
         },
-        {}
+        {},
     );
     if (Object.keys(parameterInfoByLocation).length === 0) {
         return null;
@@ -70,11 +82,11 @@ export function buildParametersSerializationInfo(parameters: OpenApiParameter[])
             objectProperty(
                 objectPropertyKey(location),
                 objectExpression(
-                    locationParameters.map(({name, info}) =>
-                        objectProperty(objectPropertyKey(name), valueToAstExpression(info))
-                    )
-                )
-            )
-        )
+                    locationParameters.map(({ name, info }) =>
+                        objectProperty(objectPropertyKey(name), valueToAstExpression(info)),
+                    ),
+                ),
+            ),
+        ),
     );
 }

@@ -4,9 +4,9 @@ export function cloneJson<T>(value: T): T {
 
 export function omit<T extends Record<string, unknown>, K extends keyof T>(
     obj: T,
-    keys: readonly K[]
+    keys: readonly K[],
 ): Omit<T, K> {
-    const result = {...obj};
+    const result = { ...obj };
     for (const key of keys) {
         delete result[key];
     }
@@ -36,4 +36,3 @@ export function groupBy<T>(items: readonly T[], keyFn: (item: T) => string): Rec
 export function uniq<T>(items: readonly T[]): T[] {
     return [...new Set(items)];
 }
-

@@ -1,34 +1,41 @@
-import type { OpenApiClientGeneratorConfig } from './openapi-to-typescript-client.ts';
-import type { OpenApiSchema } from '../schemas/common.ts';
-import type { OpenApiDocument, OpenApiHttpMethod, OpenApiOperation, OpenApiPathItem, OpenApiPaths, OpenApiTag } from '../schemas/openapi.ts';
+import type { OpenApiClientGeneratorConfig } from "./openapi-to-typescript-client.ts";
+import type { OpenApiSchema } from "../schemas/common.ts";
+import type {
+    OpenApiDocument,
+    OpenApiHttpMethod,
+    OpenApiOperation,
+    OpenApiPathItem,
+    OpenApiPaths,
+    OpenApiTag,
+} from "../schemas/openapi.ts";
 
 /**
  * Source of the API to generate TypeScript types from. Can be a file or a URL. Supports both YAML and JSON.
  */
 export type CommonApiToTypescriptGeneratorSource =
     | {
-          type: 'file';
+          type: "file";
           /**
            * Path to the file.
            */
           path: string;
       }
     | {
-          type: 'url';
+          type: "url";
           /**
            * URL to the file.
            */
           url: string;
       }
     | {
-          type: 'object';
+          type: "object";
           /**
            * OpenAPI schema as an object.
            */
           object: unknown;
       }
     | {
-          type: 'string';
+          type: "string";
           /**
            * OpenAPI schema as a string.
            */
@@ -53,7 +60,7 @@ export interface Openapi2tsConfig {
  */
 export type OpenApiDocumentPatchSchema = (
     schema: OpenApiSchema,
-    schemaName: string
+    schemaName: string,
 ) => OpenApiSchema | Promise<OpenApiSchema>;
 
 /**
@@ -61,7 +68,7 @@ export type OpenApiDocumentPatchSchema = (
  *
  * @param schemas The schemas to patch.
  */
-export type OpenApiDocumentPatchAllSchemas = (schemas: {[schemaName: string]: OpenApiSchema}) =>
+export type OpenApiDocumentPatchAllSchemas = (schemas: { [schemaName: string]: OpenApiSchema }) =>
     | {
           [schemaName: string]: OpenApiSchema;
       }
@@ -79,7 +86,7 @@ export type OpenApiDocumentPatchAllSchemas = (schemas: {[schemaName: string]: Op
 export type OpenApiDocumentPatchOperation = (
     operation: OpenApiOperation,
     path: string,
-    httpMethod: OpenApiHttpMethod
+    httpMethod: OpenApiHttpMethod,
 ) => OpenApiOperation | Promise<OpenApiOperation>;
 /**
  * Callback to patch a path item.
@@ -89,7 +96,7 @@ export type OpenApiDocumentPatchOperation = (
  */
 export type OpenApiDocumentPatchPathItem = (
     pathItem: OpenApiPathItem,
-    path: string
+    path: string,
 ) => OpenApiPathItem | Promise<OpenApiPathItem>;
 /**
  * Callback to patch tags.
@@ -102,7 +109,9 @@ export type OpenApiDocumentPatchTags = (tags: OpenApiTag[]) => OpenApiTag[] | Pr
  *
  * @param document The OpenAPI document to patch.
  */
-export type OpenApiDocumentPatchDocument = (document: OpenApiDocument) => OpenApiDocument | Promise<OpenApiDocument>;
+export type OpenApiDocumentPatchDocument = (
+    document: OpenApiDocument,
+) => OpenApiDocument | Promise<OpenApiDocument>;
 
 /**
  * Configuration to patch an OpenAPI document.
@@ -111,14 +120,16 @@ export interface CommonOpenApiClientGeneratorConfigDocumentPatch {
     /**
      * Patches for schemas.
      */
-    patchSchemas?: {[schemaName: string]: OpenApiDocumentPatchSchema} | OpenApiDocumentPatchAllSchemas;
+    patchSchemas?:
+        | { [schemaName: string]: OpenApiDocumentPatchSchema }
+        | OpenApiDocumentPatchAllSchemas;
     /**
      * Patches for paths.
      */
     patchPaths?:
         | {
               [path: string]:
-                  | {[method in OpenApiHttpMethod]?: OpenApiDocumentPatchOperation}
+                  | { [method in OpenApiHttpMethod]?: OpenApiDocumentPatchOperation }
                   | OpenApiDocumentPatchPathItem;
           }
         | ((paths: OpenApiPaths) => OpenApiPaths);

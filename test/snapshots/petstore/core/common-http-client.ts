@@ -15,7 +15,7 @@ export interface CommonHttpClientOptions {
             request: CommonHttpClientFetchRequest | undefined,
             response: CommonHttpClientFetchResponse | undefined,
             options: CommonHttpClientOptions | undefined,
-            message: string
+            message: string,
         ): Error;
     };
     /**
@@ -35,20 +35,26 @@ export interface CommonHttpClientOptions {
      */
     preprocessFetchResponse?: (
         response: CommonHttpClientFetchResponse,
-        request: CommonHttpClientFetchRequest
+        request: CommonHttpClientFetchRequest,
     ) => Promise<CommonHttpClientFetchResponse>;
     /**
      * Fetch function. Default is window.fetch-based implementation.
      */
-    fetch?: (url: URL, request: CommonHttpClientFetchRequest) => Promise<CommonHttpClientFetchResponse>;
+    fetch?: (
+        url: URL,
+        request: CommonHttpClientFetchRequest,
+    ) => Promise<CommonHttpClientFetchResponse>;
     /**
      * Type of the response body for binary responses.
      */
-    binaryResponseType: 'blob' | 'readableStream';
+    binaryResponseType: "blob" | "readableStream";
     /**
      * Format the HTTP error message.
      */
-    formatHttpErrorMessage?: (response: CommonHttpClientFetchResponse, request: CommonHttpClientFetchRequest) => string;
+    formatHttpErrorMessage?: (
+        response: CommonHttpClientFetchResponse,
+        request: CommonHttpClientFetchRequest,
+    ) => string;
     /**
      * Custom validation error handling. Can be used to log errors.
      */
@@ -56,7 +62,7 @@ export interface CommonHttpClientOptions {
     /**
      * Deprecated operations. Used to warn about deprecated operations.
      */
-    deprecatedOperations?: {[methodAndPath: string]: string /* Operation name */};
+    deprecatedOperations?: { [methodAndPath: string]: string /* Operation name */ };
     /**
      * Log a deprecation warning.
      */
@@ -69,7 +75,7 @@ export interface CommonHttpClientOptions {
          */
         operationName: string;
         path: string;
-        method: CommonHttpClientFetchRequest['method'];
+        method: CommonHttpClientFetchRequest["method"];
     }): void;
     /**
      * Determine whether to retry on error.
@@ -82,7 +88,10 @@ export interface CommonHttpClientOptions {
     /**
      * External fetch method. Will be used for external redirects.
      */
-    externalFetch?: (url: URL, request: CommonHttpClientFetchRequest) => Promise<CommonHttpClientFetchResponse>;
+    externalFetch?: (
+        url: URL,
+        request: CommonHttpClientFetchRequest,
+    ) => Promise<CommonHttpClientFetchResponse>;
     /**
      * Whether to follow redirects. Default is true. Can also be a function that decides what to do on a redirect.
      */
@@ -94,19 +103,19 @@ export interface CommonHttpClientOptions {
               response: CommonHttpClientFetchResponse;
           }) => Promise<
               | {
-                    type: 'error';
+                    type: "error";
                     error?: Error;
                 }
               | {
-                    type: 'response';
+                    type: "response";
                     response: CommonHttpClientFetchResponse;
                 }
               | {
-                    type: 'redirect';
+                    type: "redirect";
                     request?: CommonHttpClientFetchRequest;
                 }
               | {
-                    type: 'externalRedirect';
+                    type: "externalRedirect";
                     request?: CommonHttpClientFetchRequest;
                 }
           >);
@@ -133,7 +142,7 @@ export interface CommonHttpClientFetchRequest {
     /**
      * HTTP Method.
      */
-    method: 'GET' | 'HEAD' | 'POST' | 'PUT' | 'DELETE' | 'CONNECT' | 'OPTIONS' | 'PATCH';
+    method: "GET" | "HEAD" | "POST" | "PUT" | "DELETE" | "CONNECT" | "OPTIONS" | "PATCH";
     /**
      * Request headers.
      */
@@ -145,11 +154,11 @@ export interface CommonHttpClientFetchRequest {
     /**
      * Cache mode.
      */
-    cache: 'default' | 'force-cache' | 'no-cache' | 'no-store' | 'only-if-cached' | 'reload';
+    cache: "default" | "force-cache" | "no-cache" | "no-store" | "only-if-cached" | "reload";
     /**
      * Credentials mode.
      */
-    credentials: 'include' | 'omit' | 'same-origin';
+    credentials: "include" | "omit" | "same-origin";
     /**
      * Custom request properties. Can be used to pass metadata to the fetch function.
      */
@@ -157,20 +166,20 @@ export interface CommonHttpClientFetchRequest {
     /**
      * Redirect mode.
      */
-    redirect: 'error' | 'follow' | 'manual';
+    redirect: "error" | "follow" | "manual";
 }
 
 /**
  * Parameter serialization style.
  */
 export type CommonHttpClientRequestParameterSerializeStyle =
-    | 'simple'
-    | 'label'
-    | 'matrix'
-    | 'form'
-    | 'spaceDelimited'
-    | 'pipeDelimited'
-    | 'deepObject';
+    | "simple"
+    | "label"
+    | "matrix"
+    | "form"
+    | "spaceDelimited"
+    | "pipeDelimited"
+    | "deepObject";
 
 /**
  * Information about how to serialize a request parameter.
@@ -189,13 +198,16 @@ export interface CommonHttpClientRequestParameterSerializeInfo {
 /**
  * Request parameter location.
  */
-export type CommonHttpClientRequestParameterLocation = 'path' | 'query' | 'header' | 'cookie';
+export type CommonHttpClientRequestParameterLocation = "path" | "query" | "header" | "cookie";
 
 /**
  * Request parameters.
  */
 export type CommonHttpClientRequestParameters = {
-    [K in CommonHttpClientRequestParameterLocation]?: Record<string, CommonHttpClientRequestParameterSerializeInfo>;
+    [K in CommonHttpClientRequestParameterLocation]?: Record<
+        string,
+        CommonHttpClientRequestParameterSerializeInfo
+    >;
 };
 
 /**
@@ -203,7 +215,7 @@ export type CommonHttpClientRequestParameters = {
  */
 export type CommonHttpClientRequest = Omit<
     CommonHttpClientFetchRequest,
-    'body' | 'headers' | 'cache' | 'credentials' | 'redirect'
+    "body" | "headers" | "cache" | "credentials" | "redirect"
 > & {
     /**
      * Path to the resource.
@@ -229,7 +241,7 @@ export type CommonHttpClientRequest = Omit<
      * Request parameters serialization information.
      */
     parameters?: CommonHttpClientRequestParameters;
-} & Partial<Pick<CommonHttpClientFetchRequest, 'cache' | 'credentials'>>;
+} & Partial<Pick<CommonHttpClientFetchRequest, "cache" | "credentials">>;
 
 /**
  * Response of the fetch function.
@@ -266,13 +278,13 @@ export interface CommonHttpClientFetchResponse {
 }
 
 export type CommonHttpClientResponseHeaders = Record<string, string> & {
-    'set-cookie'?: string[];
+    "set-cookie"?: string[];
 };
 
 export type CommonHttpClientFetchResponseBody =
-    | {type: 'json'; data: unknown}
-    | {type: 'blob'; data: Blob}
-    | {type: 'readableStream'; data: ReadableStream<Uint8Array>};
+    | { type: "json"; data: unknown }
+    | { type: "blob"; data: Blob }
+    | { type: "readableStream"; data: ReadableStream<Uint8Array> };
 
 export interface CommonHttpClientResponse<T> {
     status: number;
@@ -306,10 +318,10 @@ export class CommonHttpClientError extends Error {
         request: CommonHttpClientFetchRequest | undefined,
         response: CommonHttpClientFetchResponse | undefined,
         options: CommonHttpClientOptions | undefined,
-        message: string
+        message: string,
     ) {
         super(message);
-        this.name = 'OpenApiClientError';
+        this.name = "OpenApiClientError";
         this.url = url;
         this.request = request;
         this.response = response;
@@ -323,7 +335,7 @@ function readableStreamToBlob(stream: ReadableStream<Uint8Array>): Promise<Blob>
     const chunks: BlobPart[] = [];
     const reader = stream.getReader();
     return new Promise((resolve, reject) => {
-        reader.read().then(function process({done, value}) {
+        reader.read().then(function process({ done, value }) {
             if (value) {
                 chunks.push(value as BlobPart);
             }
@@ -341,46 +353,52 @@ function readableStreamToBlob(stream: ReadableStream<Uint8Array>): Promise<Blob>
  */
 async function convertResponseBody(
     body: CommonHttpClientFetchResponseBody,
-    destType: CommonHttpClientFetchResponseBody['type']
+    destType: CommonHttpClientFetchResponseBody["type"],
 ): Promise<CommonHttpClientFetchResponseBody> {
     if (body.type === destType) {
         return body;
     }
-    if (body.type === 'json') {
+    if (body.type === "json") {
         const blob = new Blob([JSON.stringify(body.data)]);
-        if (destType === 'blob') {
-            return {type: 'blob', data: blob};
-        } else if (destType === 'readableStream') {
-            return {type: 'readableStream', data: blob.stream()};
+        if (destType === "blob") {
+            return { type: "blob", data: blob };
+        } else if (destType === "readableStream") {
+            return { type: "readableStream", data: blob.stream() };
         } else {
-            throw new Error('Invalid destination type.');
+            throw new Error("Invalid destination type.");
         }
     }
-    if (body.type === 'blob') {
-        if (destType === 'json') {
-            return {type: 'json', data: JSON.parse(await body.data.text())};
-        } else if (destType === 'readableStream') {
-            return {type: 'readableStream', data: body.data.stream()};
+    if (body.type === "blob") {
+        if (destType === "json") {
+            return { type: "json", data: JSON.parse(await body.data.text()) };
+        } else if (destType === "readableStream") {
+            return { type: "readableStream", data: body.data.stream() };
         } else {
-            throw new Error('Invalid destination type.');
+            throw new Error("Invalid destination type.");
         }
     }
-    if (body.type === 'readableStream') {
-        if (destType === 'json') {
-            return {type: 'json', data: JSON.parse(await (await readableStreamToBlob(body.data)).text())};
-        } else if (destType === 'blob') {
-            return {type: 'blob', data: await readableStreamToBlob(body.data)};
+    if (body.type === "readableStream") {
+        if (destType === "json") {
+            return {
+                type: "json",
+                data: JSON.parse(await (await readableStreamToBlob(body.data)).text()),
+            };
+        } else if (destType === "blob") {
+            return { type: "blob", data: await readableStreamToBlob(body.data) };
         } else {
-            throw new Error('Invalid destination type.');
+            throw new Error("Invalid destination type.");
         }
     }
-    throw new Error('Invalid response body type.');
+    throw new Error("Invalid response body type.");
 }
 
 /**
  * `extends unknown` is a trick to split the union into individual types.
  */
-type ResponseByMediaType<T extends CommonHttpClientResponse<unknown>, K extends string> = T extends unknown
+type ResponseByMediaType<
+    T extends CommonHttpClientResponse<unknown>,
+    K extends string,
+> = T extends unknown
     ? ((a: T) => void) extends (a: {
           mediaType: K;
           status: infer _Status;
@@ -391,10 +409,15 @@ type ResponseByMediaType<T extends CommonHttpClientResponse<unknown>, K extends 
         : never
     : never;
 
-export function checkReponseMediaType<T extends CommonHttpClientResponse<unknown>, K extends string>(
+export function checkReponseMediaType<
+    T extends CommonHttpClientResponse<unknown>,
+    K extends string,
+>(
     response: T,
-    mediaType: K
-): response is ResponseByMediaType<T, K> extends never ? ResponseByMediaType<T, '*/*'> : ResponseByMediaType<T, K> {
+    mediaType: K,
+): response is ResponseByMediaType<T, K> extends never
+    ? ResponseByMediaType<T, "*/*">
+    : ResponseByMediaType<T, K> {
     return response.mediaType === mediaType;
 }
 
@@ -403,55 +426,57 @@ export function isJsonMediaType(mediaType: string): boolean {
 }
 
 type AsCreatedResponseFunction<KCreated extends string, KOther extends string> = <
-    T extends CommonHttpClientResponse<unknown>
+    T extends CommonHttpClientResponse<unknown>,
 >(
-    response: T
+    response: T,
 ) =>
-    | ({[K in KCreated]: Extract<T, {status: 201}>['body']} & {created: true})
-    | ({[K in KOther]: Extract<T, {status: 200}>['body']} & {created: false});
+    | ({ [K in KCreated]: Extract<T, { status: 201 }>["body"] } & { created: true })
+    | ({ [K in KOther]: Extract<T, { status: 200 }>["body"] } & { created: false });
 
 export function asCreatedResponse<KCreated extends string>(
-    keyCreated: KCreated
+    keyCreated: KCreated,
 ): AsCreatedResponseFunction<KCreated, KCreated>;
 export function asCreatedResponse<KCreated extends string, KOther extends string>(
     keyCreated: KCreated,
-    keyOther: KOther
+    keyOther: KOther,
 ): AsCreatedResponseFunction<KCreated, KOther>;
-export function asCreatedResponse(...keys: [string] | [string, string]): AsCreatedResponseFunction<string, string> {
+export function asCreatedResponse(
+    ...keys: [string] | [string, string]
+): AsCreatedResponseFunction<string, string> {
     const keyCreated = keys[0];
     const keyOther = keys[1] ?? keyCreated;
     return (response: CommonHttpClientResponse<unknown>) => {
         if (response.status === 201) {
             return {
                 created: true,
-                [keyCreated]: response.body
+                [keyCreated]: response.body,
             };
         } else {
             return {
                 created: false,
-                [keyOther]: response.body
+                [keyOther]: response.body,
             };
         }
     };
 }
 
-export const getBody = <T>({body}: CommonHttpClientResponse<T>): T => body;
+export const getBody = <T>({ body }: CommonHttpClientResponse<T>): T => body;
 export const castResponse =
-    <T extends Omit<CommonHttpClientResponse<unknown>, 'response'>>() =>
+    <T extends Omit<CommonHttpClientResponse<unknown>, "response">>() =>
     (response: CommonHttpClientResponse<unknown>) =>
         response as WithResponse<T>;
 export const discardResult = (): void => {};
 
-export type WithResponse<T> = T & {response: CommonHttpClientFetchResponse};
+export type WithResponse<T> = T & { response: CommonHttpClientFetchResponse };
 
 export function createClientWithServices<
     TOptions,
-    TClient extends {getClient(): CommonHttpClient},
-    TServices extends Record<string, {new (client: CommonHttpClient): unknown}>
+    TClient extends { getClient(): CommonHttpClient },
+    TServices extends Record<string, { new (client: CommonHttpClient): unknown }>,
 >(
-    this: {new (options?: TOptions): TClient},
+    this: { new (options?: TOptions): TClient },
     services: TServices,
-    options?: TOptions
+    options?: TOptions,
 ): TClient & {
     [K in keyof TServices as K extends string
         ? Uncapitalize<K extends `${infer TName}Service` ? TName : K>
@@ -461,9 +486,9 @@ export function createClientWithServices<
     const extension: Record<string, unknown> = {};
     for (const serviceName in services) {
         if (Object.prototype.hasOwnProperty.call(services, serviceName)) {
-            extension[serviceName.replace(/[^\b]Service$/, '').replace(/^\w/, (s) => s.toLowerCase())] = new services[
-                serviceName
-            ](client.getClient());
+            extension[
+                serviceName.replace(/[^\b]Service$/, "").replace(/^\w/, (s) => s.toLowerCase())
+            ] = new services[serviceName](client.getClient());
         }
     }
     return Object.assign(client, extension as never);
@@ -476,211 +501,227 @@ function getErrorMessage(e: unknown) {
 /**
  * Parameter formatter.
  */
-type ParameterFormatter = (key: string, value: unknown, explode: boolean) => ParameterFormatterResult;
+type ParameterFormatter = (
+    key: string,
+    value: unknown,
+    explode: boolean,
+) => ParameterFormatterResult;
 
 /**
  * Parameter formatter result.
  */
 interface ParameterFormatterResult {
-    pairs: {key?: string; value: string}[];
+    pairs: { key?: string; value: string }[];
     pairSeparator?: string;
     keyValueSeparator?: string;
 }
 
-function parameterHasValue(value: unknown): value is string | number | boolean | Record<string, unknown> | unknown[] {
+function parameterHasValue(
+    value: unknown,
+): value is string | number | boolean | Record<string, unknown> | unknown[] {
     return (
         value !== null &&
         value !== undefined &&
         (!Array.isArray(value) || value.length > 0) &&
-        (typeof value !== 'object' || Object.keys(value).length > 0)
+        (typeof value !== "object" || Object.keys(value).length > 0)
     );
 }
 
 function parameterFormattedParameterToString({
     pairs,
-    pairSeparator = '',
-    keyValueSeparator = ''
+    pairSeparator = "",
+    keyValueSeparator = "",
 }: ParameterFormatterResult): string {
     return pairs
-        .map(({key, value}) => (key !== undefined ? `${key}${keyValueSeparator}${value}` : value))
+        .map(({ key, value }) => (key !== undefined ? `${key}${keyValueSeparator}${value}` : value))
         .join(pairSeparator);
 }
 
-const formatParameter: Record<CommonHttpClientRequestParameterSerializeStyle, ParameterFormatter> = {
-    simple(_key: string, value: unknown, explode: boolean): ParameterFormatterResult {
-        if (!parameterHasValue(value)) {
-            return {pairs: []};
-        }
-        if (Array.isArray(value)) {
-            return {pairs: [{value: value.join(',')}]};
-        }
-        if (typeof value === 'object' && value !== null) {
+const formatParameter: Record<CommonHttpClientRequestParameterSerializeStyle, ParameterFormatter> =
+    {
+        simple(_key: string, value: unknown, explode: boolean): ParameterFormatterResult {
+            if (!parameterHasValue(value)) {
+                return { pairs: [] };
+            }
+            if (Array.isArray(value)) {
+                return { pairs: [{ value: value.join(",") }] };
+            }
+            if (typeof value === "object" && value !== null) {
+                return {
+                    pairs: [
+                        {
+                            value: Object.entries(value)
+                                .map(([key, val]) => `${key}${explode ? "=" : ","}${val}`)
+                                .join(","),
+                        },
+                    ],
+                };
+            }
+            return { pairs: [{ value: String(value) }] };
+        },
+        label(_key: string, value: unknown, explode: boolean): ParameterFormatterResult {
+            if (!parameterHasValue(value)) {
+                return { pairs: [{ value: "." }] };
+            }
+            if (Array.isArray(value)) {
+                return { pairs: [{ value: "." + value.join(".") }] };
+            }
+            if (typeof value === "object" && value !== null) {
+                return {
+                    pairs: [
+                        {
+                            value: Object.entries(value)
+                                .map(([key, val]) => `.${key}${explode ? "=" : "."}${val}`)
+                                .join(""),
+                        },
+                    ],
+                };
+            }
+            return { pairs: [{ value: "." + String(value) }] };
+        },
+        matrix(key: string, value: unknown, explode: boolean): ParameterFormatterResult {
+            if (!parameterHasValue(value)) {
+                return { pairs: [{ value: `;${key}` }] };
+            }
+            if (Array.isArray(value)) {
+                return {
+                    pairs: [
+                        {
+                            value: explode
+                                ? value.map((val) => `;${key}=${val}`).join("")
+                                : `;${key}=${value.join(",")}`,
+                        },
+                    ],
+                };
+            }
+            if (typeof value === "object") {
+                return {
+                    pairs: [
+                        {
+                            value: explode
+                                ? Object.entries(value)
+                                      .map(([subKey, subValue]) => `;${subKey}=${subValue}`)
+                                      .join("")
+                                : `;${key}=${Object.entries(value)
+                                      .map(([subKey, subValue]) => `${subKey},${subValue}`)
+                                      .join(",")}`,
+                        },
+                    ],
+                };
+            }
+            return { pairs: [{ value: `;${key}=${String(value)}` }] };
+        },
+        form(key: string, value: unknown, explode: boolean): ParameterFormatterResult {
+            if (!parameterHasValue(value)) {
+                return { pairs: [] };
+            }
+            if (Array.isArray(value)) {
+                return {
+                    pairs: explode
+                        ? value.map((val) => ({ key, value: String(val) }))
+                        : [{ key, value: value.join(",") }],
+                    pairSeparator: "&",
+                    keyValueSeparator: "=",
+                };
+            }
+            if (typeof value === "object") {
+                return {
+                    pairs: explode
+                        ? Object.entries(value).map(([subKey, subValue]) => ({
+                              key: subKey,
+                              value: String(subValue),
+                          }))
+                        : [
+                              {
+                                  key,
+                                  value: Object.entries(value)
+                                      .map(([subKey, subValue]) => `${subKey},${subValue}`)
+                                      .join(","),
+                              },
+                          ],
+                    pairSeparator: "&",
+                    keyValueSeparator: "=",
+                };
+            }
+            return { pairs: [{ key, value: String(value) }] };
+        },
+        spaceDelimited(key: string, value: unknown): ParameterFormatterResult {
+            if (!parameterHasValue(value)) {
+                return { pairs: [] };
+            }
+            if (Array.isArray(value)) {
+                return {
+                    pairs: [{ key, value: value.join(" ") }],
+                };
+            }
+            if (typeof value === "object") {
+                return {
+                    pairs: [
+                        {
+                            key,
+                            value: Object.entries(value)
+                                .map(([subKey, subValue]) => `${subKey} ${subValue}`)
+                                .join(" "),
+                        },
+                    ],
+                };
+            }
+            return { pairs: [{ key, value: String(value) }] };
+        },
+        pipeDelimited(key: string, value: unknown): ParameterFormatterResult {
+            if (!parameterHasValue(value)) {
+                return { pairs: [] };
+            }
+            if (Array.isArray(value)) {
+                return {
+                    pairs: [{ key, value: value.join("|") }],
+                };
+            }
+            if (typeof value === "object") {
+                return {
+                    pairs: [
+                        {
+                            key,
+                            value: Object.entries(value)
+                                .map(([subKey, subValue]) => `${subKey}|${subValue}`)
+                                .join("|"),
+                        },
+                    ],
+                };
+            }
+            return { pairs: [{ key, value: String(value) }] };
+        },
+        deepObject(key: string, value: unknown): ParameterFormatterResult {
+            if (typeof value === "object" && !Array.isArray(value) && value !== null) {
+                return {
+                    pairs: Object.entries(value).flatMap(
+                        ([subKey, subValue]) =>
+                            formatParameter.deepObject(`${key}[${subKey}]`, subValue, true).pairs,
+                    ),
+                    pairSeparator: "&",
+                    keyValueSeparator: "=",
+                };
+            }
             return {
-                pairs: [
-                    {
-                        value: Object.entries(value)
-                            .map(([key, val]) => `${key}${explode ? '=' : ','}${val}`)
-                            .join(',')
-                    }
-                ]
+                pairs: [{ key, value: String(value) }],
             };
-        }
-        return {pairs: [{value: String(value)}]};
-    },
-    label(_key: string, value: unknown, explode: boolean): ParameterFormatterResult {
-        if (!parameterHasValue(value)) {
-            return {pairs: [{value: '.'}]};
-        }
-        if (Array.isArray(value)) {
-            return {pairs: [{value: '.' + value.join('.')}]};
-        }
-        if (typeof value === 'object' && value !== null) {
-            return {
-                pairs: [
-                    {
-                        value: Object.entries(value)
-                            .map(([key, val]) => `.${key}${explode ? '=' : '.'}${val}`)
-                            .join('')
-                    }
-                ]
-            };
-        }
-        return {pairs: [{value: '.' + String(value)}]};
-    },
-    matrix(key: string, value: unknown, explode: boolean): ParameterFormatterResult {
-        if (!parameterHasValue(value)) {
-            return {pairs: [{value: `;${key}`}]};
-        }
-        if (Array.isArray(value)) {
-            return {
-                pairs: [{value: explode ? value.map((val) => `;${key}=${val}`).join('') : `;${key}=${value.join(',')}`}]
-            };
-        }
-        if (typeof value === 'object') {
-            return {
-                pairs: [
-                    {
-                        value: explode
-                            ? Object.entries(value)
-                                  .map(([subKey, subValue]) => `;${subKey}=${subValue}`)
-                                  .join('')
-                            : `;${key}=${Object.entries(value)
-                                  .map(([subKey, subValue]) => `${subKey},${subValue}`)
-                                  .join(',')}`
-                    }
-                ]
-            };
-        }
-        return {pairs: [{value: `;${key}=${String(value)}`}]};
-    },
-    form(key: string, value: unknown, explode: boolean): ParameterFormatterResult {
-        if (!parameterHasValue(value)) {
-            return {pairs: []};
-        }
-        if (Array.isArray(value)) {
-            return {
-                pairs: explode ? value.map((val) => ({key, value: String(val)})) : [{key, value: value.join(',')}],
-                pairSeparator: '&',
-                keyValueSeparator: '='
-            };
-        }
-        if (typeof value === 'object') {
-            return {
-                pairs: explode
-                    ? Object.entries(value).map(([subKey, subValue]) => ({key: subKey, value: String(subValue)}))
-                    : [
-                          {
-                              key,
-                              value: Object.entries(value)
-                                  .map(([subKey, subValue]) => `${subKey},${subValue}`)
-                                  .join(',')
-                          }
-                      ],
-                pairSeparator: '&',
-                keyValueSeparator: '='
-            };
-        }
-        return {pairs: [{key, value: String(value)}]};
-    },
-    spaceDelimited(key: string, value: unknown): ParameterFormatterResult {
-        if (!parameterHasValue(value)) {
-            return {pairs: []};
-        }
-        if (Array.isArray(value)) {
-            return {
-                pairs: [{key, value: value.join(' ')}]
-            };
-        }
-        if (typeof value === 'object') {
-            return {
-                pairs: [
-                    {
-                        key,
-                        value: Object.entries(value)
-                            .map(([subKey, subValue]) => `${subKey} ${subValue}`)
-                            .join(' ')
-                    }
-                ]
-            };
-        }
-        return {pairs: [{key, value: String(value)}]};
-    },
-    pipeDelimited(key: string, value: unknown): ParameterFormatterResult {
-        if (!parameterHasValue(value)) {
-            return {pairs: []};
-        }
-        if (Array.isArray(value)) {
-            return {
-                pairs: [{key, value: value.join('|')}]
-            };
-        }
-        if (typeof value === 'object') {
-            return {
-                pairs: [
-                    {
-                        key,
-                        value: Object.entries(value)
-                            .map(([subKey, subValue]) => `${subKey}|${subValue}`)
-                            .join('|')
-                    }
-                ]
-            };
-        }
-        return {pairs: [{key, value: String(value)}]};
-    },
-    deepObject(key: string, value: unknown): ParameterFormatterResult {
-        if (typeof value === 'object' && !Array.isArray(value) && value !== null) {
-            return {
-                pairs: Object.entries(value).flatMap(
-                    ([subKey, subValue]) => formatParameter.deepObject(`${key}[${subKey}]`, subValue, true).pairs
-                ),
-                pairSeparator: '&',
-                keyValueSeparator: '='
-            };
-        }
-        return {
-            pairs: [{key, value: String(value)}]
-        };
-    }
-};
+        },
+    };
 
 /**
  * Stores the deprecation warning state. For every shown deprecation warning, the method and path are stored in order to
  * avoid showing the same warning appearing multiple times.
  */
-const deprecationWarningShown: {[methodAndPath: string]: boolean} = {};
+const deprecationWarningShown: { [methodAndPath: string]: boolean } = {};
 
 /**
  * Default implementation of the redirect handler.
  */
-const defaultRedirectHandler: Exclude<CommonHttpClientOptions['followRedirects'], boolean | undefined> = async ({
-    url,
-    response
-}: {
-    url: URL;
-    response: CommonHttpClientFetchResponse;
-}) => {
-    const redirectUrl = new URL(response.headers['location'], url);
+const defaultRedirectHandler: Exclude<
+    CommonHttpClientOptions["followRedirects"],
+    boolean | undefined
+> = async ({ url, response }: { url: URL; response: CommonHttpClientFetchResponse }) => {
+    const redirectUrl = new URL(response.headers["location"], url);
     let responseUrl;
     try {
         responseUrl = new URL(response.url);
@@ -689,9 +730,9 @@ const defaultRedirectHandler: Exclude<CommonHttpClientOptions['followRedirects']
     }
 
     if (responseUrl.host !== redirectUrl.host) {
-        return {type: 'externalRedirect'};
+        return { type: "externalRedirect" };
     } else {
-        return {type: 'redirect'};
+        return { type: "redirect" };
     }
 };
 
@@ -700,20 +741,22 @@ const defaultRedirectHandler: Exclude<CommonHttpClientOptions['followRedirects']
  */
 export async function defaultFetch(
     url: URL,
-    request: CommonHttpClientFetchRequest
+    request: CommonHttpClientFetchRequest,
 ): Promise<CommonHttpClientFetchResponse> {
-    const {...requestProps} = request;
+    const { ...requestProps } = request;
     const requestInit: RequestInit = requestProps;
     const response = await fetch(url, requestInit);
-    const body: CommonHttpClientFetchResponseBody = isJsonMediaType(response.headers.get('content-type') ?? '')
-        ? {type: 'json', data: await response.json()}
-        : {type: 'blob', data: await response.blob()};
+    const body: CommonHttpClientFetchResponseBody = isJsonMediaType(
+        response.headers.get("content-type") ?? "",
+    )
+        ? { type: "json", data: await response.json() }
+        : { type: "blob", data: await response.blob() };
     const headers: CommonHttpClientResponseHeaders = {};
     response.headers.forEach((value, key) => {
         headers[key] = value;
     });
-    if (response.headers.has('set-cookie') && 'getSetCookie' in response.headers) {
-        headers['set-cookie'] = (response.headers as {getSetCookie(): string[]}).getSetCookie();
+    if (response.headers.has("set-cookie") && "getSetCookie" in response.headers) {
+        headers["set-cookie"] = (response.headers as { getSetCookie(): string[] }).getSetCookie();
     }
     return {
         status: response.status,
@@ -722,7 +765,7 @@ export async function defaultFetch(
         url: response.url,
         headers,
         ok: response.ok,
-        customRequestProps: request.customRequestProps
+        customRequestProps: request.customRequestProps,
     };
 }
 
@@ -753,7 +796,10 @@ export class CommonHttpClient {
     /**
      * Logs a deprecation warning if the operation is deprecated.
      */
-    protected logDeprecationWarningIfNecessary(params: {path: string; method: CommonHttpClientFetchRequest['method']}) {
+    protected logDeprecationWarningIfNecessary(params: {
+        path: string;
+        method: CommonHttpClientFetchRequest["method"];
+    }) {
         const methodAndPath = `${params.method} ${params.path}`;
         const operationName = this.options.deprecatedOperations?.[methodAndPath];
         if (!operationName) {
@@ -762,10 +808,14 @@ export class CommonHttpClient {
         if (!deprecationWarningShown[methodAndPath]) {
             deprecationWarningShown[methodAndPath] = true;
             if (this.options.logDeprecationWarning) {
-                this.options.logDeprecationWarning({method: params.method, path: params.path, operationName});
+                this.options.logDeprecationWarning({
+                    method: params.method,
+                    path: params.path,
+                    operationName,
+                });
             } else {
                 console.warn(
-                    `Deprecated API call ${this.options.apiClientClassName}.${operationName}: ${methodAndPath}`
+                    `Deprecated API call ${this.options.apiClientClassName}.${operationName}: ${methodAndPath}`,
                 );
             }
         }
@@ -776,14 +826,16 @@ export class CommonHttpClient {
      */
     protected getSearchParams(
         params: Record<string, unknown>,
-        parameters: Record<string, CommonHttpClientRequestParameterSerializeInfo>
+        parameters: Record<string, CommonHttpClientRequestParameterSerializeInfo>,
     ): URLSearchParams {
         const result = new URLSearchParams();
         for (const [key, value] of Object.entries(params)) {
-            const {style = 'form', explode = style === 'form'}: CommonHttpClientRequestParameterSerializeInfo =
-                parameters[key] ?? {};
-            const {pairs} = formatParameter[style](key, value, explode);
-            for (const {key, value} of pairs) {
+            const {
+                style = "form",
+                explode = style === "form",
+            }: CommonHttpClientRequestParameterSerializeInfo = parameters[key] ?? {};
+            const { pairs } = formatParameter[style](key, value, explode);
+            for (const { key, value } of pairs) {
                 if (key !== undefined) {
                     result.append(key, value);
                 }
@@ -797,17 +849,17 @@ export class CommonHttpClient {
      */
     protected buildUrlPath(
         request: CommonHttpClientRequest,
-        parameters: Record<string, CommonHttpClientRequestParameterSerializeInfo>
+        parameters: Record<string, CommonHttpClientRequestParameterSerializeInfo>,
     ): string {
         const pathParams = request.pathParams;
         if (pathParams) {
             return request.path.replace(/\{(.*?)}/g, (original, paramName: string) => {
                 if (Object.prototype.hasOwnProperty.call(pathParams, paramName)) {
-                    const {style = 'simple', explode = false} = parameters[paramName] ?? {};
+                    const { style = "simple", explode = false } = parameters[paramName] ?? {};
                     return encodeURI(
                         parameterFormattedParameterToString(
-                            formatParameter[style](paramName, pathParams[paramName], explode)
-                        )
+                            formatParameter[style](paramName, pathParams[paramName], explode),
+                        ),
                     );
                 }
                 return original;
@@ -821,11 +873,14 @@ export class CommonHttpClient {
      */
     protected buildUrl(request: CommonHttpClientRequest): URL {
         const url = new URL(
-            this.buildUrlPath(request, request.parameters?.path ?? {}).replace(/^\//, ''),
-            this.options.baseUrl.replace(/\/?$/, '/')
+            this.buildUrlPath(request, request.parameters?.path ?? {}).replace(/^\//, ""),
+            this.options.baseUrl.replace(/\/?$/, "/"),
         );
         if (request.query) {
-            for (const [key, value] of this.getSearchParams(request.query, request.parameters?.query ?? {})) {
+            for (const [key, value] of this.getSearchParams(
+                request.query,
+                request.parameters?.query ?? {},
+            )) {
                 url.searchParams.append(key, value);
             }
         }
@@ -837,54 +892,64 @@ export class CommonHttpClient {
             throw error;
         }
 
-        const {request, response, url} = error;
+        const { request, response, url } = error;
 
         if (!request || !response) {
             throw error;
         }
 
-        if (response.status < 300 || response.status >= 400 || !response.headers['location']) {
+        if (response.status < 300 || response.status >= 400 || !response.headers["location"]) {
             throw error;
         }
 
         const redirectHandler =
-            typeof this.options.followRedirects === 'function' ? this.options.followRedirects : defaultRedirectHandler;
+            typeof this.options.followRedirects === "function"
+                ? this.options.followRedirects
+                : defaultRedirectHandler;
 
-        const action = await redirectHandler({url, request, response});
+        const action = await redirectHandler({ url, request, response });
 
-        if (!action || !('type' in action)) {
+        if (!action || !("type" in action)) {
             error.message = `Invalid redirect handler result for ${error.message}.`;
             throw error;
         }
 
         const redirectPreservingMethod = response.status === 307 || response.status === 308;
-        const newUrl = new URL(response.headers['location'], url);
+        const newUrl = new URL(response.headers["location"], url);
 
-        if (action.type === 'error') {
+        if (action.type === "error") {
             error.message = `Redirect to ${newUrl.toString()} not allowed by redirect handler. ${error.message}`;
             throw action.error ?? error;
-        } else if (action.type === 'response') {
+        } else if (action.type === "response") {
             return action.response;
-        } else if (action.type === 'redirect') {
+        } else if (action.type === "redirect") {
             const fetchRequest =
                 action.request ??
                 (
                     await this.generateFetchRequest({
                         path: newUrl.pathname,
-                        method: redirectPreservingMethod ? request.method : 'GET'
+                        method: redirectPreservingMethod ? request.method : "GET",
                     })
                 )[0];
-            return this.performFetchRequest(newUrl, fetchRequest, this.options.fetch ?? defaultFetch);
-        } else if (action.type === 'externalRedirect') {
+            return this.performFetchRequest(
+                newUrl,
+                fetchRequest,
+                this.options.fetch ?? defaultFetch,
+            );
+        } else if (action.type === "externalRedirect") {
             const fetchRequest = action.request ?? {
                 // Change method to GET for 301, 302, 303 redirects
-                method: redirectPreservingMethod ? request.method : 'GET',
+                method: redirectPreservingMethod ? request.method : "GET",
                 headers: {},
                 cache: request.cache,
                 credentials: request.credentials,
-                redirect: 'error'
+                redirect: "error",
             };
-            return this.performFetchRequest(newUrl, fetchRequest, this.options.externalFetch ?? defaultFetch);
+            return this.performFetchRequest(
+                newUrl,
+                fetchRequest,
+                this.options.externalFetch ?? defaultFetch,
+            );
         } else {
             error.message = `Invalid redirect handler result for ${error.message}.`;
             throw error;
@@ -899,14 +964,16 @@ export class CommonHttpClient {
             return await this.performRequest(request);
         } catch (error) {
             if (this.options.processError) {
-                throw this.options.processError(error instanceof Error ? error : new Error(String(error)));
+                throw this.options.processError(
+                    error instanceof Error ? error : new Error(String(error)),
+                );
             }
             throw error;
         }
     }
 
     protected async generateFetchRequest(
-        request: CommonHttpClientRequest
+        request: CommonHttpClientRequest,
     ): Promise<[CommonHttpClientFetchRequest, CommonHttpClientRequest]> {
         try {
             request = await this.preprocessRequest(request);
@@ -920,7 +987,7 @@ export class CommonHttpClient {
                     undefined,
                     undefined,
                     this.options,
-                    `Error building request URL: ${getErrorMessage(e)}`
+                    `Error building request URL: ${getErrorMessage(e)}`,
                 );
             }
             throw new this.options.errorClass(
@@ -928,7 +995,7 @@ export class CommonHttpClient {
                 undefined,
                 undefined,
                 this.options,
-                `preprocessRequest error: ${getErrorMessage(e)}`
+                `preprocessRequest error: ${getErrorMessage(e)}`,
             );
         }
         const {
@@ -946,19 +1013,22 @@ export class CommonHttpClient {
             {
                 ...otherRequestProps,
                 headers,
-                cache: cache ?? 'default',
-                credentials: credentials ?? 'same-origin',
-                redirect: 'error',
-                body: this.getRequestBody(request)
+                cache: cache ?? "default",
+                credentials: credentials ?? "same-origin",
+                redirect: "error",
+                body: this.getRequestBody(request),
             },
-            request
+            request,
         ];
     }
 
     protected async performFetchRequest(
         url: URL,
         fetchRequest: CommonHttpClientFetchRequest,
-        fetchMethod: (url: URL, request: CommonHttpClientFetchRequest) => Promise<CommonHttpClientFetchResponse>
+        fetchMethod: (
+            url: URL,
+            request: CommonHttpClientFetchRequest,
+        ) => Promise<CommonHttpClientFetchResponse>,
     ): Promise<CommonHttpClientFetchResponse> {
         let attemptNumber = 1;
         for (;;) {
@@ -967,18 +1037,27 @@ export class CommonHttpClient {
                 try {
                     fetchResponse = await fetchMethod(url, fetchRequest);
                 } catch (e) {
-                    throw new this.options.errorClass(url, fetchRequest, undefined, this.options, getErrorMessage(e));
+                    throw new this.options.errorClass(
+                        url,
+                        fetchRequest,
+                        undefined,
+                        this.options,
+                        getErrorMessage(e),
+                    );
                 }
                 if (this.options.preprocessFetchResponse) {
                     try {
-                        fetchResponse = await this.options.preprocessFetchResponse(fetchResponse, fetchRequest);
+                        fetchResponse = await this.options.preprocessFetchResponse(
+                            fetchResponse,
+                            fetchRequest,
+                        );
                     } catch (e) {
                         throw new this.options.errorClass(
                             url,
                             fetchRequest,
                             fetchResponse,
                             this.options,
-                            `preprocessFetchResponse error: ${getErrorMessage(e)}`
+                            `preprocessFetchResponse error: ${getErrorMessage(e)}`,
                         );
                     }
                 }
@@ -991,8 +1070,8 @@ export class CommonHttpClient {
                             this.options,
                             this.options.formatHttpErrorMessage
                                 ? this.options.formatHttpErrorMessage(fetchResponse, fetchRequest)
-                                : `HTTP Error ${fetchRequest.method} ${url.toString()} ${fetchResponse.status} (${fetchResponse.statusText})`
-                        ) as CommonHttpClientError
+                                : `HTTP Error ${fetchRequest.method} ${url.toString()} ${fetchResponse.status} (${fetchResponse.statusText})`,
+                        ) as CommonHttpClientError,
                     );
                 }
                 return fetchResponse;
@@ -1008,7 +1087,9 @@ export class CommonHttpClient {
     /**
      * Perform a request.
      */
-    protected async performRequest(request: CommonHttpClientRequest): Promise<CommonHttpClientFetchResponse> {
+    protected async performRequest(
+        request: CommonHttpClientRequest,
+    ): Promise<CommonHttpClientFetchResponse> {
         this.logDeprecationWarningIfNecessary(request);
         const [fetchRequest, preprocessedRequest] = await this.generateFetchRequest(request);
         let url;
@@ -1020,7 +1101,7 @@ export class CommonHttpClient {
                 undefined,
                 undefined,
                 this.options,
-                `Error building request URL: ${getErrorMessage(e)}`
+                `Error building request URL: ${getErrorMessage(e)}`,
             );
         }
         return this.performFetchRequest(url, fetchRequest, this.options.fetch ?? defaultFetch);
@@ -1030,12 +1111,14 @@ export class CommonHttpClient {
      * Post-process the response.
      */
     responseHandler(distribution: {
-        [statusCode: string]: {[mediaType: string]: CommonHttpClientFetchResponseBody['type']};
+        [statusCode: string]: { [mediaType: string]: CommonHttpClientFetchResponseBody["type"] };
     }) {
-        return async (response: CommonHttpClientFetchResponse): Promise<CommonHttpClientResponse<unknown>> => {
+        return async (
+            response: CommonHttpClientFetchResponse,
+        ): Promise<CommonHttpClientResponse<unknown>> => {
             const body = response.body;
-            const contentType = response.headers['content-type'];
-            const mediaType = contentType ? contentType.replace(/;.*$/, '') : undefined;
+            const contentType = response.headers["content-type"];
+            const mediaType = contentType ? contentType.replace(/;.*$/, "") : undefined;
 
             const mediaTypes = distribution[response.status] ?? {};
 
@@ -1044,16 +1127,16 @@ export class CommonHttpClient {
                 destType = mediaTypes[mediaType];
 
                 if (!destType) {
-                    destType = mediaTypes[mediaType.replace(/\/.*$/, '/*')];
+                    destType = mediaTypes[mediaType.replace(/\/.*$/, "/*")];
                 }
                 if (!destType) {
-                    destType = mediaTypes[mediaType.replace(/^.*\//, '*/')];
+                    destType = mediaTypes[mediaType.replace(/^.*\//, "*/")];
                 }
                 if (!destType) {
-                    destType = mediaTypes['*/*'];
+                    destType = mediaTypes["*/*"];
                 }
             } else {
-                destType = mediaTypes['*/*'];
+                destType = mediaTypes["*/*"];
             }
 
             if (!destType) {
@@ -1066,14 +1149,14 @@ export class CommonHttpClient {
                         undefined,
                         response,
                         this.options,
-                        `Error converting response body: ${getErrorMessage(e)}`
+                        `Error converting response body: ${getErrorMessage(e)}`,
                     );
                 }
                 return {
                     mediaType,
                     status: response.status,
                     body: binaryBody,
-                    response
+                    response,
                 };
             }
 
@@ -1083,7 +1166,7 @@ export class CommonHttpClient {
                     mediaType,
                     status: response.status,
                     body: convertedBody.data,
-                    response
+                    response,
                 };
             } catch (e) {
                 throw new this.options.errorClass(
@@ -1091,7 +1174,7 @@ export class CommonHttpClient {
                     undefined,
                     response,
                     this.options,
-                    `Error converting response body: ${getErrorMessage(e)}`
+                    `Error converting response body: ${getErrorMessage(e)}`,
                 );
             }
         };
@@ -1115,14 +1198,19 @@ export class CommonHttpClient {
     /**
      * Remove undefined and null values from headers.
      */
-    private cleanupHeaders(headers?: CommonHttpClientRequestHeaders): CommonHttpClientFetchRequestHeaders {
+    private cleanupHeaders(
+        headers?: CommonHttpClientRequestHeaders,
+    ): CommonHttpClientFetchRequestHeaders {
         if (headers === undefined) {
             return {};
         }
         return Object.fromEntries(
             Object.entries(headers ?? {})
-                .filter((header): header is [string, string] => header[1] !== undefined && header[1] !== null)
-                .map(([key, value]) => [key.toLowerCase(), value])
+                .filter(
+                    (header): header is [string, string] =>
+                        header[1] !== undefined && header[1] !== null,
+                )
+                .map(([key, value]) => [key.toLowerCase(), value]),
         );
     }
 
@@ -1131,21 +1219,25 @@ export class CommonHttpClient {
             return undefined;
         }
         for (const [key, value] of Object.entries(request.headers ?? {})) {
-            if (key.toLowerCase() === 'content-type' && value && isJsonMediaType(value)) {
+            if (key.toLowerCase() === "content-type" && value && isJsonMediaType(value)) {
                 return JSON.stringify(request.body);
             }
         }
         return request.body as BodyInit;
     }
 
-    protected async preprocessRequest(request: CommonHttpClientRequest): Promise<CommonHttpClientRequest> {
+    protected async preprocessRequest(
+        request: CommonHttpClientRequest,
+    ): Promise<CommonHttpClientRequest> {
         const requestWithHeaders = {
             ...request,
             headers: {
                 ...this.options.headers,
-                ...this.cleanupHeaders(request.headers)
-            }
+                ...this.cleanupHeaders(request.headers),
+            },
         };
-        return this.options.preprocessRequest ? this.options.preprocessRequest(requestWithHeaders) : requestWithHeaders;
+        return this.options.preprocessRequest
+            ? this.options.preprocessRequest(requestWithHeaders)
+            : requestWithHeaders;
     }
 }

@@ -1,5 +1,12 @@
-import {cloneJson} from '../utils/collections.ts';
-import type { OpenApiInfo, OpenApiExample, OpenApiExternalDocumentation, OpenApiParameter, OpenApiSchema, OpenApiServer } from './common.ts';
+import { cloneJson } from "../utils/collections.ts";
+import type {
+    OpenApiInfo,
+    OpenApiExample,
+    OpenApiExternalDocumentation,
+    OpenApiParameter,
+    OpenApiSchema,
+    OpenApiServer,
+} from "./common.ts";
 
 /**
  * Holds a set of reusable objects for different aspects of the OAS. All objects defined within the components object
@@ -113,7 +120,7 @@ export interface OpenApiDocument {
 /**
  * OpenAPI Header Object.
  */
-export type OpenApiHeader = Omit<OpenApiParameter, 'name' | 'in'>;
+export type OpenApiHeader = Omit<OpenApiParameter, "name" | "in">;
 
 /**
  * OpenAPI Link Object.
@@ -160,7 +167,7 @@ export interface OpenApiSecurityScheme {
     /**
      * The type of the security scheme. Valid values are "apiKey", "http", "oauth2", "openIdConnect".
      */
-    type: 'apiKey' | 'http' | 'mutualTLS' | 'oauth2' | 'openIdConnect';
+    type: "apiKey" | "http" | "mutualTLS" | "oauth2" | "openIdConnect";
     /**
      * A short description for security scheme.
      */
@@ -172,7 +179,7 @@ export interface OpenApiSecurityScheme {
     /**
      * The location of the API key. Valid values are "query", "header" or "cookie".
      */
-    in?: 'query' | 'header' | 'cookie';
+    in?: "query" | "header" | "cookie";
     /**
      * The name of the HTTP Authorization scheme to be used in the Authorization header as defined in RFC7235.
      */
@@ -243,7 +250,16 @@ export interface OpenApiOAuthFlow {
 /**
  * List of HTTP methods defined by OpenAPI.
  */
-export const openApiHttpMethods = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'] as const;
+export const openApiHttpMethods = [
+    "get",
+    "put",
+    "post",
+    "delete",
+    "options",
+    "head",
+    "patch",
+    "trace",
+] as const;
 
 /**
  * OpenAPI HTTP method.
@@ -287,7 +303,7 @@ export type OpenApiPathItem = {
      * An alternative server array to service all operations in this path.
      */
     servers?: OpenApiServer[];
-} & {[K in OpenApiHttpMethod]?: OpenApiOperation};
+} & { [K in OpenApiHttpMethod]?: OpenApiOperation };
 
 /**
  * Each Media Type Object provides schema and examples for the media type identified by its key.
@@ -338,7 +354,14 @@ export interface OpenApiEncoding {
     /**
      * Describes how a specific property value will be serialized depending on its type.
      */
-    style?: 'matrix' | 'label' | 'form' | 'simple' | 'spaceDelimited' | 'pipeDelimited' | 'deepObject';
+    style?:
+        | "matrix"
+        | "label"
+        | "form"
+        | "simple"
+        | "spaceDelimited"
+        | "pipeDelimited"
+        | "deepObject";
     /**
      * When this is true, property values of type array or object generate separate parameters for each value of the
      * array, or key-value pair of the map. For other types of properties this property has no effect. When style is
@@ -496,7 +519,7 @@ export function processOpenApiDocument(document: unknown): OpenApiDocument {
     const openApiDocument = cloneJson(document) as OpenApiDocument;
     if (openApiDocument.components && openApiDocument.components.schemas) {
         for (const [name, schema] of Object.entries(openApiDocument.components.schemas)) {
-            if (typeof schema !== 'boolean') {
+            if (typeof schema !== "boolean") {
                 schema.name = name;
             }
         }

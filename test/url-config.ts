@@ -1,36 +1,36 @@
-import path from 'node:path';
-import {fileURLToPath} from 'node:url';
-import type {Openapi2tsConfig} from '../src/index.ts';
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import type { Openapi2tsConfig } from "../src/index.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default {
     generates: [
         {
-            type: 'openapiClient',
+            type: "openapiClient",
             document: {
                 source: {
-                    type: 'url',
-                    url: 'http://127.0.0.1:8000/api/schema/?format=json'
-                }
+                    type: "url",
+                    url: "http://127.0.0.1:8000/api/schema/?format=json",
+                },
             },
-            outputDirPath: path.join(__dirname, 'snapshots/url-test'),
+            outputDirPath: path.join(__dirname, "snapshots/url-test"),
             client: {
-                name: 'ApiClient',
-                baseUrl: '/api'
+                name: "ApiClient",
+                baseUrl: "/api",
             },
             operations: {
-                showDeprecatedWarnings: true
+                showDeprecatedWarnings: true,
             },
             core: {
-                cleanupFiles: true
+                cleanupFiles: true,
             },
             models: {
-                cleanupFiles: true
+                cleanupFiles: true,
             },
             services: {
-                cleanupFiles: true
-            }
-        }
-    ]
+                cleanupFiles: true,
+            },
+        },
+    ],
 } satisfies Openapi2tsConfig;

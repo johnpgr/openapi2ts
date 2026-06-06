@@ -1,4 +1,4 @@
-import * as commonHttpClient from './common-http-client';
+import * as commonHttpClient from "./common-http-client";
 
 /**
  * Base class for all services that need to make HTTP requests.
@@ -16,7 +16,7 @@ export class CommonHttpService {
      * Get an instance of the specified service class.
      */
     protected getServiceInstance<T extends CommonHttpService>(
-        serviceClass: new (getClientInstance: () => commonHttpClient.CommonHttpClient) => T
+        serviceClass: new (getClientInstance: () => commonHttpClient.CommonHttpClient) => T,
     ): T {
         let serviceInstance = this.serviceInstancesMap.get(serviceClass);
         if (!serviceInstance) {

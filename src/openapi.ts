@@ -14,8 +14,8 @@ export type {
     OpenApiHeader,
     OpenApiLink,
     OpenApiOAuthFlow,
-    OpenApiOAuthFlows
-} from './schemas/openapi.ts';
+    OpenApiOAuthFlows,
+} from "./schemas/openapi.ts";
 export type {
     OpenApiInfo,
     OpenApiExample,
@@ -31,7 +31,7 @@ export type {
     OpenApiSchemaPrimitiveValue,
     OpenApiServerVariable,
     OpenApiFormats,
-    OpenApiPrimitiveTypes
-} from './schemas/common.ts';
+    OpenApiPrimitiveTypes,
+} from "./schemas/common.ts";
 // eslint-disable-next-line no-duplicate-imports
-export {openApiHttpMethods} from './schemas/openapi.ts';
+export { openApiHttpMethods } from "./schemas/openapi.ts";
