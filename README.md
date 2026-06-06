@@ -22,8 +22,25 @@ await client.pet.findPetsByStatus({ status: ["available"] })
 
 ```bash
 npm install
-node src/cli/index.ts generate test/snapshot-config.ts
-node src/cli/index.ts check test/snapshot-config.ts
+```
+
+Generate a client from CLI flags — no config file:
+
+```bash
+openapi2ts generate --file ./openapi/schema.json --out ./src/api
+openapi2ts check --file ./openapi/schema.json --out ./src/api
+
+openapi2ts generate --url http://127.0.0.1:8000/api/schema/?format=json -o ./src/api
+openapi2ts generate --file ./openapi/schema.json --out ./src/api --name MyApiClient --base-url /api
+```
+
+Quick mode defaults to `ApiClient` and skips cleanup, layout, JSDoc hooks, and document patches. For those, use a [config file](#configuration) (`openapi2ts generate` with no args auto-discovers `openapi2ts.config.*`).
+
+In this repo, golden snapshots use a config:
+
+```bash
+openapi2ts generate test/snapshot-config.ts
+openapi2ts check test/snapshot-config.ts
 ```
 
 npm scripts:
