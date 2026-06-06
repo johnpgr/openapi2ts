@@ -1,6 +1,6 @@
 import { identifier, tsQualifiedName, tsTypeParameterInstantiation, tsTypeReference, tsUnionType } from '../../emit/index.ts';
 import type { TSType } from '../../emit/index.ts';
-import ts from '../../emit/load-typescript.ts';
+import ts from 'typescript';
 import { addDependencyImport, extendDependenciesAndGetResult } from '../../utils/dependencies.ts';
 import type { DependencyImports } from '../../utils/dependencies.ts';
 import {getRelativeImportPath, isRelativeImportPath} from '../../utils/paths.ts';

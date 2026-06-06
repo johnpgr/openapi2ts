@@ -1,4 +1,4 @@
-import ts from './load-typescript.ts';
+import ts from 'typescript';
 import {objectPropertyKey} from './nodes.ts';
 
 export function valueToExpression(value: unknown): ts.Expression {

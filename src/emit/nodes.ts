@@ -1,4 +1,4 @@
-import ts from './load-typescript.ts';
+import ts from 'typescript';
 import { finalizeExpression, finalizeObjectBindingPattern, finalizeType } from './compat.ts';
 import type { CompatExpression, CompatType, MutableAssignmentPattern, MutableObjectExpression, MutableObjectPattern } from './compat.ts';
 

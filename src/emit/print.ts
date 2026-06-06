@@ -1,4 +1,4 @@
-import ts from './load-typescript.ts';
+import ts from 'typescript';
 import { finalizeType } from './compat.ts';
 import type { CompatType } from './compat.ts';
 

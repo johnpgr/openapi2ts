@@ -1,4 +1,4 @@
-import ts from '../emit/load-typescript.ts';
+import ts from 'typescript';
 import type { ClassMethod, ClassProperty } from '../emit/nodes.ts';
 
 export function makeProtected(entity: ClassProperty | ClassMethod): ClassProperty | ClassMethod {

@@ -1,6 +1,6 @@
 import { arrayExpression, arrowFunctionExpression, assignmentPattern, blockStatement, callExpression, classProperty, expressionStatement, identifier, isValidIdentifier, memberExpression, objectExpression, objectPattern, objectPatternProperty, objectProperty, returnStatement, setPropertyReturnType, stringLiteral, thisExpression, tsLiteralType, tsPropertySignature, tsStringKeyword, tsTypeAnnotation, tsTypeLiteral, tsTypeParameterInstantiation, tsTypeReference, tsUndefinedKeyword, tsUnionType } from '../../emit/index.ts';
 import type { Expression, Identifier, TSType } from '../../emit/index.ts';
-import ts from '../../emit/load-typescript.ts';
+import ts from 'typescript';
 import {uniq} from '../../utils/collections.ts';
 import {generateBinaryType} from './binary.ts';
 import type { GetModelData } from './models.ts';

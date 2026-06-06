@@ -1,4 +1,4 @@
-import ts from './load-typescript.ts';
+import ts from 'typescript';
 import { isMutableIntersectionType, isMutableTypeLiteral, isMutableUnionType } from './compat.ts';
 import type { CompatType } from './compat.ts';
 

@@ -1,4 +1,4 @@
-import ts from './load-typescript.ts';
+import ts from 'typescript';
 
 export interface MutableObjectExpression {
     kind: 'ObjectExpression';

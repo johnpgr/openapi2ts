@@ -1,7 +1,7 @@
 import path from 'path';
 import { exportNamedDeclaration, identifier, isTSIndexSignature, isTSIntersectionType, isTSTypeLiteral, program, tsExpressionWithTypeArguments, tsInterfaceBody, tsInterfaceDeclaration, tsTypeAliasDeclaration, tsTypeParameterInstantiation, tsTypeReference } from '../../emit/index.ts';
 import type { ExportNamedDeclaration } from '../../emit/index.ts';
-import ts from '../../emit/load-typescript.ts';
+import ts from 'typescript';
 import {groupBy} from '../../utils/collections.ts';
 import {generateBinaryType} from './binary.ts';
 import type { OpenApiSchema } from '../../schemas/common.ts';

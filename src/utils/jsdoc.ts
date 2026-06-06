@@ -1,4 +1,4 @@
-import ts from '../emit/load-typescript.ts';
+import ts from 'typescript';
 import {isTSPropertySignature} from '../emit/type-guards.ts';
 import {wordWrap} from './string-utils.ts';
 import type { AnnotatedApiEntity } from '../schema-to-typescript/common.ts';
