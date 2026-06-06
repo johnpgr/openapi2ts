@@ -40,6 +40,112 @@ Relative imports in `src/` use explicit `.ts` extensions (Node native ESM). Afte
 
 ---
 
+## Using in another project (git submodule)
+
+This package is **not published to npm (and never will be)**. Pull it into a consumer repo as a **git submodule** and wire it with a `file:` dependency.
+
+### 1. Add the submodule
+
+From your app repo root:
+
+```bash
+git submodule add https://github.com/johnpgr/openapi2ts.git vendor/openapi2ts
+```
+
+Pick any path you like (`vendor/openapi2ts` is just an example). Commit `.gitmodules` and the submodule pointer.
+
+Cloners need submodules initialized:
+
+```bash
+git clone --recurse-submodules <your-app-repo>
+# or, in an existing clone:
+git submodule update --init --recursive
+```
+
+### 2. Point `package.json` at the checkout
+
+```json
+{
+  "dependencies": {
+    "openapi2ts": "file:vendor/openapi2ts"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.0"
+  },
+  "scripts": {
+    "api:generate": "openapi2ts generate",
+    "api:check": "openapi2ts check"
+  }
+}
+```
+
+Then install from your app root:
+
+```bash
+npm install
+```
+
+`openapi2ts` is a **peer dependency** — your app must install `typescript` (>= 6). The consumer also needs **Node 24+** (native type stripping for the shipped `.ts` sources and CLI).
+
+npm links the `openapi2ts` binary to `vendor/openapi2ts/src/cli/index.ts`, so `npx openapi2ts` and the scripts above work like a normal local package.
+
+### 3. Add a config and generate
+
+Put a config in your app root (auto-discovered) or pass it explicitly:
+
+```ts
+// openapi2ts.config.ts
+import type { Openapi2tsConfig } from "openapi2ts"
+
+export default {
+  generates: [{
+    type: "openapiClient",
+    document: {
+      source: { type: "file", path: "./openapi/schema.json" }
+    },
+    outputDirPath: "./src/api",
+    client: { name: "ApiClient", baseUrl: "/api" }
+  }]
+} satisfies Openapi2tsConfig
+```
+
+```bash
+npm run api:generate
+npm run api:check    # fails if generated output is stale
+```
+
+Quick mode without a config file also works:
+
+```bash
+npx openapi2ts generate --file ./openapi/schema.json --out ./src/api
+```
+
+### 4. Programmatic use (optional)
+
+```ts
+import { openapiToTypescriptClient } from "openapi2ts/openapi-client"
+import type { OpenApiDocument } from "openapi2ts/openapi"
+```
+
+Types and runtime entry points resolve to the submodule’s raw `src/*.ts` files via `package.json` `exports`.
+
+### 5. Updating the generator
+
+When you want a newer `openapi2ts` revision:
+
+```bash
+cd vendor/openapi2ts
+git fetch && git checkout <ref>    # branch, tag, or commit
+cd ../..
+git add vendor/openapi2ts
+npm install                        # refresh the file: link if needed
+npm run api:generate
+```
+
+Pin the submodule to a commit (or tag) you trust; treat bumps like any other vendored dependency.
+
+---
+
 ## Goals
 
 - Zero published dependencies — runtime uses Node built-ins plus the peer `typescript` install
