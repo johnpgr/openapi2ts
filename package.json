@@ -1,7 +1,7 @@
 {
     "name": "openapi2ts",
     "version": "0.1.0",
-    "description": "Zero-dependency OpenAPI to TypeScript client generator (Node 24+, JSON only). Ships raw TypeScript — no build step.",
+    "description": "OpenAPI to TypeScript client generator. Only the TypeScript compiler is required as a dependency (peer). Node 24+, JSON only. Ships raw TypeScript — no build step.",
     "license": "MIT",
     "bin": {
         "openapi2ts": "./src/cli/index.ts"
