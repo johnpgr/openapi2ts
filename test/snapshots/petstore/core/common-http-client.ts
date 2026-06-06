@@ -320,12 +320,12 @@ export class CommonHttpClientError extends Error {
 const jsonContentTypeRegExp = /^application\/(\w+\+)?json/;
 
 function readableStreamToBlob(stream: ReadableStream<Uint8Array>): Promise<Blob> {
-    const chunks: Uint8Array[] = [];
+    const chunks: BlobPart[] = [];
     const reader = stream.getReader();
     return new Promise((resolve, reject) => {
         reader.read().then(function process({done, value}) {
             if (value) {
-                chunks.push(value);
+                chunks.push(value as BlobPart);
             }
             if (done) {
                 resolve(new Blob(chunks));

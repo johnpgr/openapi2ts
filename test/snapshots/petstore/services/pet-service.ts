@@ -3,19 +3,19 @@ import { CommonHttpService as CommonHttpService } from "../core/common-http-serv
 import type { Pet as Pet, ApiResponse as ApiResponse } from "../models/pet";
 /** Everything about your Pets */
 export class PetService extends CommonHttpService {
-    addPet: Promise<void> = ({ mediaType = "application/json", pet }: {} & ({
+    addPet = async ({ mediaType = "application/json", pet }: {} & ({
         mediaType?: "application/json";
         pet: Pet;
     } | {
         mediaType: "application/xml";
         pet: Pet;
-    })) => {
+    })): Promise<void> => {
         return this.getClientInstance().request({ path: "/pet", method: "POST", headers: { "Content-Type": mediaType }, body: pet }).then(commonHttpClient.discardResult);
     };
-    deletePet: Promise<void> = ({ petId, apiKey }: {
+    deletePet = async ({ petId, apiKey }: {
         petId: number;
         apiKey?: string;
-    }) => {
+    }): Promise<void> => {
         return this.getClientInstance().request({ path: "/pet/{petId}", method: "DELETE", pathParams: { petId }, headers: { api_key: apiKey } }).then(commonHttpClient.discardResult);
     };
     /**
@@ -30,7 +30,9 @@ export class PetService extends CommonHttpService {
      *
      *    successful operation
      */
-    findPetsByStatus: Promise<commonHttpClient.WithResponse<{
+    findPetsByStatus = async ({ status }: {
+        status: ("available" | "pending" | "sold")[];
+    }): Promise<commonHttpClient.WithResponse<{
         status: 200;
         mediaType: "application/xml";
         body: Blob;
@@ -38,9 +40,7 @@ export class PetService extends CommonHttpService {
         status: 200;
         mediaType: "application/json";
         body: Pet[];
-    }>> = ({ status }: {
-        status: ("available" | "pending" | "sold")[];
-    }) => {
+    }>> => {
         return this.getClientInstance().request({ path: "/pet/findByStatus", method: "GET", query: { status } }).then(this.getClientInstance().responseHandler({ 200: { "application/xml": "blob", "application/json": "json" } })).then(commonHttpClient.castResponse<{
             status: 200;
             mediaType: "application/xml";
@@ -65,7 +65,9 @@ export class PetService extends CommonHttpService {
      *
      *    successful operation
      */
-    findPetsByTags: Promise<commonHttpClient.WithResponse<{
+    findPetsByTags = async ({ tags }: {
+        tags: string[];
+    }): Promise<commonHttpClient.WithResponse<{
         status: 200;
         mediaType: "application/xml";
         body: Blob;
@@ -73,9 +75,7 @@ export class PetService extends CommonHttpService {
         status: 200;
         mediaType: "application/json";
         body: Pet[];
-    }>> = ({ tags }: {
-        tags: string[];
-    }) => {
+    }>> => {
         return this.getClientInstance().request({ path: "/pet/findByTags", method: "GET", query: { tags } }).then(this.getClientInstance().responseHandler({ 200: { "application/xml": "blob", "application/json": "json" } })).then(commonHttpClient.castResponse<{
             status: 200;
             mediaType: "application/xml";
@@ -98,7 +98,9 @@ export class PetService extends CommonHttpService {
      *
      *    successful operation
      */
-    getPetById: Promise<commonHttpClient.WithResponse<{
+    getPetById = async ({ petId }: {
+        petId: number;
+    }): Promise<commonHttpClient.WithResponse<{
         status: 200;
         mediaType: "application/xml";
         body: Blob;
@@ -106,9 +108,7 @@ export class PetService extends CommonHttpService {
         status: 200;
         mediaType: "application/json";
         body: Pet;
-    }>> = ({ petId }: {
-        petId: number;
-    }) => {
+    }>> => {
         return this.getClientInstance().request({ path: "/pet/{petId}", method: "GET", pathParams: { petId } }).then(this.getClientInstance().responseHandler({ 200: { "application/xml": "blob", "application/json": "json" } })).then(commonHttpClient.castResponse<{
             status: 200;
             mediaType: "application/xml";
@@ -119,16 +119,16 @@ export class PetService extends CommonHttpService {
             body: Pet;
         }>());
     };
-    updatePet: Promise<void> = ({ mediaType = "application/json", pet }: {} & ({
+    updatePet = async ({ mediaType = "application/json", pet }: {} & ({
         mediaType?: "application/json";
         pet: Pet;
     } | {
         mediaType: "application/xml";
         pet: Pet;
-    })) => {
+    })): Promise<void> => {
         return this.getClientInstance().request({ path: "/pet", method: "PUT", headers: { "Content-Type": mediaType }, body: pet }).then(commonHttpClient.discardResult);
     };
-    updatePetWithForm: Promise<void> = ({ petId, requestBody }: {
+    updatePetWithForm = async ({ petId, requestBody }: {
         petId: number;
         requestBody: {
             /** Updated name of the pet */
@@ -138,14 +138,14 @@ export class PetService extends CommonHttpService {
         } & {
             [key: string]: unknown;
         };
-    }) => {
+    }): Promise<void> => {
         return this.getClientInstance().request({ path: "/pet/{petId}", method: "POST", pathParams: { petId }, headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: requestBody }).then(commonHttpClient.discardResult);
     };
     /** @returns successful operation */
-    uploadFile: Promise<ApiResponse> = ({ petId, requestBody }: {
+    uploadFile = async ({ petId, requestBody }: {
         petId: number;
         requestBody: Blob | ReadableStream;
-    }) => {
+    }): Promise<ApiResponse> => {
         return this.getClientInstance().request({ path: "/pet/{petId}/uploadImage", method: "POST", pathParams: { petId }, headers: { "Content-Type": "application/octet-stream" }, body: requestBody }).then(this.getClientInstance().responseHandler({ 200: { "application/json": "json" } })).then(commonHttpClient.castResponse<{
             status: 200;
             mediaType: "application/json";

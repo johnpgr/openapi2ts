@@ -130,6 +130,18 @@ export function setPropertyReturnType(property: ts.PropertyDeclaration, type: Co
         property.initializer
     );
 }
+
+export function setArrowFunctionReturnType(arrow: ts.ArrowFunction, type: CompatType): ts.ArrowFunction {
+    return ts.factory.updateArrowFunction(
+        arrow,
+        arrow.modifiers,
+        arrow.typeParameters,
+        arrow.parameters,
+        finalizeType(type),
+        arrow.equalsGreaterThanToken,
+        arrow.body
+    );
+}
 export function logicalExpression(
     operator: '||' | '&&' | '??',
     left: ts.Expression,
@@ -228,22 +240,26 @@ export function createPatternParameter(pattern: MutableObjectPattern, initialize
 export function arrowFunctionExpression(
     params: MutableObjectPattern,
     body: ts.Block | ts.Expression,
-    defaultParameterInitializer?: CompatExpression
+    defaultParameterInitializer?: CompatExpression,
+    isAsync?: boolean
 ): ts.ArrowFunction;
 export function arrowFunctionExpression(
     params: readonly ts.ParameterDeclaration[],
     body: ts.Block | ts.Expression,
-    defaultParameterInitializer?: CompatExpression
+    defaultParameterInitializer?: CompatExpression,
+    isAsync?: boolean
 ): ts.ArrowFunction;
 export function arrowFunctionExpression(
     params: readonly ts.ParameterDeclaration[] | MutableObjectPattern,
     body: ts.Block | ts.Expression,
-    defaultParameterInitializer?: CompatExpression
+    defaultParameterInitializer?: CompatExpression,
+    isAsync = false
 ): ts.ArrowFunction {
     const parameters = Array.isArray(params)
         ? [...params]
         : [createPatternParameter(params as MutableObjectPattern, defaultParameterInitializer ? finalizeExpression(defaultParameterInitializer) : undefined)];
-    return ts.factory.createArrowFunction(undefined, undefined, parameters, undefined, undefined, body);
+    const modifiers = isAsync ? [ts.factory.createModifier(ts.SyntaxKind.AsyncKeyword)] : undefined;
+    return ts.factory.createArrowFunction(modifiers, undefined, parameters, undefined, undefined, body);
 }
 
 export function functionDeclaration(

@@ -20,7 +20,8 @@ function processCoreFile(
 ): string {
     let result = code.replace(/\r\n/g, '\n');
     result = result.replace(IMPORT_PATH_RE, (_match, importPath: string) => {
-        return `from './${formatFilename(importPath, filenameFormat)}.ts'`;
+        const baseName = importPath.replace(/\.tsx?$/, '');
+        return `from './${formatFilename(baseName, filenameFormat)}'`;
     });
     if (commentsConfig.leadingComment) {
         result =

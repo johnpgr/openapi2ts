@@ -7,9 +7,9 @@ export class StoreService extends CommonHttpService {
      * For valid response try integer IDs with positive integer value. Negative or
      * non-integer values will generate API errors
      */
-    deleteOrder: Promise<void> = ({ orderId }: {
+    deleteOrder = async ({ orderId }: {
         orderId: number;
-    }) => {
+    }): Promise<void> => {
         return this.getClientInstance().request({ path: "/store/order/{orderId}", method: "DELETE", pathParams: { orderId } }).then(commonHttpClient.discardResult);
     };
     /**
@@ -17,9 +17,9 @@ export class StoreService extends CommonHttpService {
      *
      * @returns successful operation
      */
-    getInventory: Promise<{
+    getInventory = async (): Promise<{
         [key: string]: number;
-    }> = () => {
+    }> => {
         return this.getClientInstance().request({ path: "/store/inventory", method: "GET" }).then(this.getClientInstance().responseHandler({ 200: { "application/json": "json" } })).then(commonHttpClient.castResponse<{
             status: 200;
             mediaType: "application/json";
@@ -41,7 +41,9 @@ export class StoreService extends CommonHttpService {
      *
      *    successful operation
      */
-    getOrderById: Promise<commonHttpClient.WithResponse<{
+    getOrderById = async ({ orderId }: {
+        orderId: number;
+    }): Promise<commonHttpClient.WithResponse<{
         status: 200;
         mediaType: "application/xml";
         body: Blob;
@@ -49,9 +51,7 @@ export class StoreService extends CommonHttpService {
         status: 200;
         mediaType: "application/json";
         body: Order;
-    }>> = ({ orderId }: {
-        orderId: number;
-    }) => {
+    }>> => {
         return this.getClientInstance().request({ path: "/store/order/{orderId}", method: "GET", pathParams: { orderId } }).then(this.getClientInstance().responseHandler({ 200: { "application/xml": "blob", "application/json": "json" } })).then(commonHttpClient.castResponse<{
             status: 200;
             mediaType: "application/xml";
@@ -72,7 +72,9 @@ export class StoreService extends CommonHttpService {
      *
      *    successful operation
      */
-    placeOrder: Promise<commonHttpClient.WithResponse<{
+    placeOrder = async ({ order }: {
+        order: Order;
+    }): Promise<commonHttpClient.WithResponse<{
         status: 200;
         mediaType: "application/xml";
         body: Blob;
@@ -80,9 +82,7 @@ export class StoreService extends CommonHttpService {
         status: 200;
         mediaType: "application/json";
         body: Order;
-    }>> = ({ order }: {
-        order: Order;
-    }) => {
+    }>> => {
         return this.getClientInstance().request({ path: "/store/order", method: "POST", headers: { "Content-Type": "application/json" }, body: order }).then(this.getClientInstance().responseHandler({ 200: { "application/xml": "blob", "application/json": "json" } })).then(commonHttpClient.castResponse<{
             status: 200;
             mediaType: "application/xml";

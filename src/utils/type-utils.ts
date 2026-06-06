@@ -1,6 +1,6 @@
 import { isBooleanLiteral, isIdentifier, isNumericLiteral, isStringLiteral, isTSCallSignatureDeclaration, isTSConstructSignatureDeclaration, isTSIntersectionType, isTSLiteralTypeNode, isTSMethodSignature, isTSPropertySignature, isTSTypeLiteral, isTSUnionType, tsBooleanKeyword, tsIntersectionType, tsPropertySignature, tsTypeAnnotation, tsTypeLiteral, tsUnionType } from '../emit/index.ts';
 import type { TSIntersectionType, TSPropertySignature, TSType, TSTypeLiteral, TSUnionType } from '../emit/index.ts';
-import {cloneTypeElement, cloneTypeLiteral, typeNodesEqual} from '../emit/print.ts';
+import {cloneTypeElement, typeNodesEqual} from '../emit/print.ts';
 import type { OpenApiSchema } from '../schemas/common.ts';
 
 function flattenUnions(union: TSUnionType): TSUnionType {
@@ -111,9 +111,8 @@ export function simplifyUnionTypeIfPossible(union: TSUnionType): TSType {
                 );
                 if (keysWithDifferences.length === 1) {
                     const [keyWithDifference] = keysWithDifferences;
-                    const cloned = cloneTypeLiteral(current);
                     current = tsTypeLiteral(
-                        cloned.members.map((member) => {
+                        current.members.map((member) => {
                             if (isTSPropertySignature(member)) {
                                 const key = getPropertyKey(member);
                                 if (key === keyWithDifference) {

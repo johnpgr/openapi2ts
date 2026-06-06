@@ -1,4 +1,4 @@
-import * as commonHttpClient from './common-http-client.ts';
+import * as commonHttpClient from './common-http-client';
 
 /**
  * Base class for all services that need to make HTTP requests.
