@@ -57,34 +57,16 @@ Relative imports in `src/` use explicit `.ts` extensions (Node native ESM). Afte
 
 ---
 
-## Using in another project (git submodule)
+## How to install
 
-This package is **not published to npm (and never will be)**. Pull it into a consumer repo as a **git submodule** and wire it with a `file:` dependency.
+This package is **not published to npm (and never will be)**. Install it from GitHub releases so consumer apps use a tagged version instead of whatever commit is currently on the default branch.
 
-### 1. Add the submodule
-
-From your app repo root:
-
-```bash
-git submodule add https://github.com/johnpgr/openapi2ts.git vendor/openapi2ts
-```
-
-Pick any path you like (`vendor/openapi2ts` is just an example). Commit `.gitmodules` and the submodule pointer.
-
-Cloners need submodules initialized:
-
-```bash
-git clone --recurse-submodules <your-app-repo>
-# or, in an existing clone:
-git submodule update --init --recursive
-```
-
-### 2. Point `package.json` at the checkout
+GitHub releases are based on git tags. Keep release tags semver-shaped (`v0.1.0`, `v0.2.0`, etc.) and npm can resolve the newest matching tag:
 
 ```json
 {
   "dependencies": {
-    "openapi2ts": "file:vendor/openapi2ts"
+    "openapi2ts": "github:johnpgr/openapi2ts#semver:^0.1.0"
   },
   "devDependencies": {
     "typescript": "^6.0.0"
@@ -104,9 +86,21 @@ npm install
 
 `openapi2ts` is a **peer dependency** — your app must install `typescript` (>= 6). The consumer also needs **Node 24+** (native type stripping for the shipped `.ts` sources and CLI).
 
-npm links the `openapi2ts` binary to `vendor/openapi2ts/src/cli/index.ts`, so `npx openapi2ts` and the scripts above work like a normal local package.
+npm links the `openapi2ts` binary to `src/cli/index.ts` inside the installed git package, so `npx openapi2ts` and the scripts above work like a normal package.
 
-### 3. Add a config and generate
+If you need to pin an exact release instead of a semver range:
+
+```json
+{
+  "dependencies": {
+    "openapi2ts": "github:johnpgr/openapi2ts#v0.1.0"
+  }
+}
+```
+
+npm does not read GitHub's "Latest" release label directly; it resolves git tags. Use `#semver:^0.1.0` when you want npm to move to the newest compatible release tag after `npm update openapi2ts`.
+
+### 1. Add a config and generate
 
 Put a config in your app root (auto-discovered) or pass it explicitly:
 
@@ -137,16 +131,65 @@ Quick mode without a config file also works:
 npx openapi2ts generate --file ./openapi/schema.json --out ./src/api
 ```
 
-### 4. Programmatic use (optional)
+### 2. Programmatic use (optional)
 
 ```ts
 import { openapiToTypescriptClient } from "openapi2ts/openapi-client"
 import type { OpenApiDocument } from "openapi2ts/openapi"
 ```
 
-Types and runtime entry points resolve to the submodule’s raw `src/*.ts` files via `package.json` `exports`.
+Types and runtime entry points resolve to the package's raw `src/*.ts` files via `package.json` `exports`.
 
-### 5. Updating the generator
+### 3. Updating the generator
+
+With a semver dependency, update to the newest compatible release:
+
+```bash
+npm update openapi2ts
+npm run api:generate
+```
+
+For an exact-tag dependency, edit the tag in `package.json`, then reinstall:
+
+```bash
+npm install
+npm run api:generate
+```
+
+Treat release bumps like any other dependency update: regenerate the client and commit the generated diff with the dependency lockfile change.
+
+### Vendored install with a submodule
+
+If you need the generator checked into a predictable path, use a git submodule and a `file:` dependency instead of the release dependency above.
+
+From your app repo root:
+
+```bash
+git submodule add https://github.com/johnpgr/openapi2ts.git vendor/openapi2ts
+```
+
+Pick any path you like (`vendor/openapi2ts` is just an example). Commit `.gitmodules` and the submodule pointer.
+
+Cloners need submodules initialized:
+
+```bash
+git clone --recurse-submodules <your-app-repo>
+# or, in an existing clone:
+git submodule update --init --recursive
+```
+
+Point `package.json` at the checkout:
+
+```json
+{
+  "dependencies": {
+    "openapi2ts": "file:vendor/openapi2ts"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.0"
+  }
+}
+```
 
 When you want a newer `openapi2ts` revision:
 
@@ -160,6 +203,33 @@ npm run api:generate
 ```
 
 Pin the submodule to a commit (or tag) you trust; treat bumps like any other vendored dependency.
+
+---
+
+## GitHub releases
+
+There is no package build or publish step for releases. A release is a semver git tag plus the GitHub Release notes for that tag.
+
+Release checklist:
+
+```bash
+npm test
+npm run typecheck
+npm version patch --no-git-tag-version   # or minor/major
+git add package.json package-lock.json
+git commit -m "Release v0.1.1"
+git tag -a v0.1.1 -m "v0.1.1"
+git push origin master
+git push origin v0.1.1
+```
+
+Then create the GitHub Release from the pushed tag:
+
+```bash
+gh release create v0.1.1 --title "v0.1.1" --notes "Release notes here"
+```
+
+The `package.json` version and tag should match. Consumer installs like `github:johnpgr/openapi2ts#semver:^0.1.0` depend on those release tags staying semver-compatible.
 
 ---
 
