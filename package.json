@@ -1,6 +1,6 @@
 {
     "name": "openapi2ts",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "description": "OpenAPI to TypeScript client generator. Only the TypeScript compiler is required as a peer. Node 24+, JSON only. Ships raw TypeScript.",
     "license": "MIT",
     "types": "./src/index.ts",

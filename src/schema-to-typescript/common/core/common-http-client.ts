@@ -330,6 +330,7 @@ export class CommonHttpClientError extends Error {
 }
 
 const jsonContentTypeRegExp = /^application\/(\w+\+)?json/;
+const hasOwn = Object.prototype.hasOwnProperty;
 
 function readableStreamToBlob(stream: ReadableStream<Uint8Array>): Promise<Blob> {
     const chunks: BlobPart[] = [];
@@ -519,12 +520,21 @@ interface ParameterFormatterResult {
 function parameterHasValue(
     value: unknown,
 ): value is string | number | boolean | Record<string, unknown> | unknown[] {
-    return (
-        value !== null &&
-        value !== undefined &&
-        (!Array.isArray(value) || value.length > 0) &&
-        (typeof value !== "object" || Object.keys(value).length > 0)
-    );
+    if (value === null || value === undefined) {
+        return false;
+    }
+    if (Array.isArray(value)) {
+        return value.length > 0;
+    }
+    if (typeof value !== "object") {
+        return true;
+    }
+    for (const key in value) {
+        if (hasOwn.call(value, key)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function parameterFormattedParameterToString({
@@ -532,9 +542,104 @@ function parameterFormattedParameterToString({
     pairSeparator = "",
     keyValueSeparator = "",
 }: ParameterFormatterResult): string {
-    return pairs
-        .map(({ key, value }) => (key !== undefined ? `${key}${keyValueSeparator}${value}` : value))
-        .join(pairSeparator);
+    let result = "";
+    for (let index = 0; index < pairs.length; index++) {
+        if (index > 0) {
+            result += pairSeparator;
+        }
+        const pair = pairs[index];
+        result +=
+            pair.key !== undefined
+                ? `${pair.key}${keyValueSeparator}${pair.value}`
+                : pair.value;
+    }
+    return result;
+}
+
+function joinObjectEntries(
+    value: object,
+    entrySeparator: string,
+    keyValueSeparator: string,
+    entryPrefix = "",
+): string {
+    let result = "";
+    let needsSeparator = false;
+    for (const key in value) {
+        if (!hasOwn.call(value, key)) {
+            continue;
+        }
+        if (needsSeparator) {
+            result += entrySeparator;
+        }
+        result += `${entryPrefix}${key}${keyValueSeparator}${(value as Record<string, unknown>)[key]}`;
+        needsSeparator = true;
+    }
+    return result;
+}
+
+function joinObjectPairs(value: object, separator: string): string {
+    let result = "";
+    let needsSeparator = false;
+    for (const key in value) {
+        if (!hasOwn.call(value, key)) {
+            continue;
+        }
+        if (needsSeparator) {
+            result += separator;
+        }
+        result += `${key}${separator}${(value as Record<string, unknown>)[key]}`;
+        needsSeparator = true;
+    }
+    return result;
+}
+
+function joinArrayWithKeyPrefix(values: unknown[], key: string): string {
+    let result = "";
+    for (const value of values) {
+        result += `;${key}=${value}`;
+    }
+    return result;
+}
+
+function appendObjectFormPairs(
+    pairs: ParameterFormatterResult["pairs"],
+    value: object,
+): void {
+    for (const key in value) {
+        if (hasOwn.call(value, key)) {
+            pairs.push({ key, value: String((value as Record<string, unknown>)[key]) });
+        }
+    }
+}
+
+function appendArrayFormPairs(
+    pairs: ParameterFormatterResult["pairs"],
+    key: string,
+    values: unknown[],
+): void {
+    for (const value of values) {
+        pairs.push({ key, value: String(value) });
+    }
+}
+
+function appendDeepObjectPairs(
+    pairs: ParameterFormatterResult["pairs"],
+    key: string,
+    value: unknown,
+): void {
+    if (typeof value === "object" && !Array.isArray(value) && value !== null) {
+        for (const subKey in value) {
+            if (hasOwn.call(value, subKey)) {
+                appendDeepObjectPairs(
+                    pairs,
+                    `${key}[${subKey}]`,
+                    (value as Record<string, unknown>)[subKey],
+                );
+            }
+        }
+        return;
+    }
+    pairs.push({ key, value: String(value) });
 }
 
 const formatParameter: Record<CommonHttpClientRequestParameterSerializeStyle, ParameterFormatter> =
@@ -550,9 +655,7 @@ const formatParameter: Record<CommonHttpClientRequestParameterSerializeStyle, Pa
                 return {
                     pairs: [
                         {
-                            value: Object.entries(value)
-                                .map(([key, val]) => `${key}${explode ? "=" : ","}${val}`)
-                                .join(","),
+                            value: joinObjectEntries(value, ",", explode ? "=" : ","),
                         },
                     ],
                 };
@@ -570,9 +673,7 @@ const formatParameter: Record<CommonHttpClientRequestParameterSerializeStyle, Pa
                 return {
                     pairs: [
                         {
-                            value: Object.entries(value)
-                                .map(([key, val]) => `.${key}${explode ? "=" : "."}${val}`)
-                                .join(""),
+                            value: joinObjectEntries(value, "", explode ? "=" : ".", "."),
                         },
                     ],
                 };
@@ -588,7 +689,7 @@ const formatParameter: Record<CommonHttpClientRequestParameterSerializeStyle, Pa
                     pairs: [
                         {
                             value: explode
-                                ? value.map((val) => `;${key}=${val}`).join("")
+                                ? joinArrayWithKeyPrefix(value, key)
                                 : `;${key}=${value.join(",")}`,
                         },
                     ],
@@ -599,12 +700,8 @@ const formatParameter: Record<CommonHttpClientRequestParameterSerializeStyle, Pa
                     pairs: [
                         {
                             value: explode
-                                ? Object.entries(value)
-                                      .map(([subKey, subValue]) => `;${subKey}=${subValue}`)
-                                      .join("")
-                                : `;${key}=${Object.entries(value)
-                                      .map(([subKey, subValue]) => `${subKey},${subValue}`)
-                                      .join(",")}`,
+                                ? joinObjectEntries(value, "", "=", ";")
+                                : `;${key}=${joinObjectPairs(value, ",")}`,
                         },
                     ],
                 };
@@ -616,29 +713,27 @@ const formatParameter: Record<CommonHttpClientRequestParameterSerializeStyle, Pa
                 return { pairs: [] };
             }
             if (Array.isArray(value)) {
+                const pairs: ParameterFormatterResult["pairs"] = [];
+                if (explode) {
+                    appendArrayFormPairs(pairs, key, value);
+                } else {
+                    pairs.push({ key, value: value.join(",") });
+                }
                 return {
-                    pairs: explode
-                        ? value.map((val) => ({ key, value: String(val) }))
-                        : [{ key, value: value.join(",") }],
+                    pairs,
                     pairSeparator: "&",
                     keyValueSeparator: "=",
                 };
             }
             if (typeof value === "object") {
+                const pairs: ParameterFormatterResult["pairs"] = [];
+                if (explode) {
+                    appendObjectFormPairs(pairs, value);
+                } else {
+                    pairs.push({ key, value: joinObjectPairs(value, ",") });
+                }
                 return {
-                    pairs: explode
-                        ? Object.entries(value).map(([subKey, subValue]) => ({
-                              key: subKey,
-                              value: String(subValue),
-                          }))
-                        : [
-                              {
-                                  key,
-                                  value: Object.entries(value)
-                                      .map(([subKey, subValue]) => `${subKey},${subValue}`)
-                                      .join(","),
-                              },
-                          ],
+                    pairs,
                     pairSeparator: "&",
                     keyValueSeparator: "=",
                 };
@@ -659,9 +754,7 @@ const formatParameter: Record<CommonHttpClientRequestParameterSerializeStyle, Pa
                     pairs: [
                         {
                             key,
-                            value: Object.entries(value)
-                                .map(([subKey, subValue]) => `${subKey} ${subValue}`)
-                                .join(" "),
+                            value: joinObjectPairs(value, " "),
                         },
                     ],
                 };
@@ -682,9 +775,7 @@ const formatParameter: Record<CommonHttpClientRequestParameterSerializeStyle, Pa
                     pairs: [
                         {
                             key,
-                            value: Object.entries(value)
-                                .map(([subKey, subValue]) => `${subKey}|${subValue}`)
-                                .join("|"),
+                            value: joinObjectPairs(value, "|"),
                         },
                     ],
                 };
@@ -693,11 +784,10 @@ const formatParameter: Record<CommonHttpClientRequestParameterSerializeStyle, Pa
         },
         deepObject(key: string, value: unknown): ParameterFormatterResult {
             if (typeof value === "object" && !Array.isArray(value) && value !== null) {
+                const pairs: ParameterFormatterResult["pairs"] = [];
+                appendDeepObjectPairs(pairs, key, value);
                 return {
-                    pairs: Object.entries(value).flatMap(
-                        ([subKey, subValue]) =>
-                            formatParameter.deepObject(`${key}[${subKey}]`, subValue, true).pairs,
-                    ),
+                    pairs,
                     pairSeparator: "&",
                     keyValueSeparator: "=",
                 };
@@ -829,19 +919,31 @@ export class CommonHttpClient {
         parameters: Record<string, CommonHttpClientRequestParameterSerializeInfo>,
     ): URLSearchParams {
         const result = new URLSearchParams();
-        for (const [key, value] of Object.entries(params)) {
+        this.appendSearchParams(result, params, parameters);
+        return result;
+    }
+
+    protected appendSearchParams(
+        result: URLSearchParams,
+        params: Record<string, unknown>,
+        parameters: Record<string, CommonHttpClientRequestParameterSerializeInfo>,
+    ): void {
+        for (const key in params) {
+            if (!hasOwn.call(params, key)) {
+                continue;
+            }
             const {
                 style = "form",
                 explode = style === "form",
             }: CommonHttpClientRequestParameterSerializeInfo = parameters[key] ?? {};
-            const { pairs } = formatParameter[style](key, value, explode);
-            for (const { key, value } of pairs) {
-                if (key !== undefined) {
-                    result.append(key, value);
+            const { pairs } = formatParameter[style](key, params[key], explode);
+            for (let index = 0; index < pairs.length; index++) {
+                const pair = pairs[index];
+                if (pair.key !== undefined) {
+                    result.append(pair.key, pair.value);
                 }
             }
         }
-        return result;
     }
 
     /**
@@ -877,12 +979,11 @@ export class CommonHttpClient {
             this.options.baseUrl.replace(/\/?$/, "/"),
         );
         if (request.query) {
-            for (const [key, value] of this.getSearchParams(
+            this.appendSearchParams(
+                url.searchParams,
                 request.query,
                 request.parameters?.query ?? {},
-            )) {
-                url.searchParams.append(key, value);
-            }
+            );
         }
         return url;
     }
@@ -1201,24 +1302,61 @@ export class CommonHttpClient {
     private cleanupHeaders(
         headers?: CommonHttpClientRequestHeaders,
     ): CommonHttpClientFetchRequestHeaders {
+        const result: CommonHttpClientFetchRequestHeaders = {};
         if (headers === undefined) {
-            return {};
+            return result;
         }
-        return Object.fromEntries(
-            Object.entries(headers ?? {})
-                .filter(
-                    (header): header is [string, string] =>
-                        header[1] !== undefined && header[1] !== null,
-                )
-                .map(([key, value]) => [key.toLowerCase(), value]),
-        );
+        for (const key in headers) {
+            if (!hasOwn.call(headers, key)) {
+                continue;
+            }
+            const value = headers[key];
+            if (value !== undefined && value !== null) {
+                result[key.toLowerCase()] = value;
+            }
+        }
+        return result;
+    }
+
+    private getRequestHeadersForPreprocess(
+        headers?: CommonHttpClientRequestHeaders,
+    ): CommonHttpClientRequestHeaders {
+        const result: CommonHttpClientRequestHeaders = {};
+        const defaultHeaders = this.options.headers;
+        if (defaultHeaders !== undefined) {
+            for (const key in defaultHeaders) {
+                if (hasOwn.call(defaultHeaders, key)) {
+                    result[key] = defaultHeaders[key];
+                }
+            }
+        }
+        if (headers !== undefined) {
+            for (const key in headers) {
+                if (!hasOwn.call(headers, key)) {
+                    continue;
+                }
+                const value = headers[key];
+                if (value !== undefined && value !== null) {
+                    result[key.toLowerCase()] = value;
+                }
+            }
+        }
+        return result;
     }
 
     protected getRequestBody(request: CommonHttpClientRequest): BodyInit | undefined {
         if (request.body === undefined) {
             return undefined;
         }
-        for (const [key, value] of Object.entries(request.headers ?? {})) {
+        const headers = request.headers;
+        if (headers === undefined) {
+            return request.body as BodyInit;
+        }
+        for (const key in headers) {
+            if (!hasOwn.call(headers, key)) {
+                continue;
+            }
+            const value = headers[key];
             if (key.toLowerCase() === "content-type" && value && isJsonMediaType(value)) {
                 return JSON.stringify(request.body);
             }
@@ -1231,10 +1369,7 @@ export class CommonHttpClient {
     ): Promise<CommonHttpClientRequest> {
         const requestWithHeaders = {
             ...request,
-            headers: {
-                ...this.options.headers,
-                ...this.cleanupHeaders(request.headers),
-            },
+            headers: this.getRequestHeadersForPreprocess(request.headers),
         };
         return this.options.preprocessRequest
             ? this.options.preprocessRequest(requestWithHeaders)
