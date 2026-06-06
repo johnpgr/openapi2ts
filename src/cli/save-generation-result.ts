@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import {indexBy} from '../utils/collections.ts';
 import type { ClientGenerationResultFile } from '../schema-to-typescript/config.ts';
+import {indexGenerationResultFiles, readExistingGenerationResultFile, resolveGenerationResultFile} from './generation-result-files.ts';
 
 export async function saveGenerationResult({
     files,
@@ -12,7 +12,7 @@ export async function saveGenerationResult({
     outputDirPath: string;
     cleanupDirectories: string[];
 }) {
-    const filesIndex = indexBy(files, ({filename}) => path.resolve(outputDirPath, filename));
+    const filesIndex = indexGenerationResultFiles(files, outputDirPath);
     await Promise.all([
         ...cleanupDirectories.map(async (directoryRelativePath) => {
             const directoryPath = path.resolve(outputDirPath, directoryRelativePath);
@@ -25,21 +25,15 @@ export async function saveGenerationResult({
             }
         }),
         ...files.map(async ({filename, data}) => {
-            const fullFilename = path.resolve(outputDirPath, filename);
+            const fullFilename = resolveGenerationResultFile(outputDirPath, filename);
             try {
-                let exists = false;
-                try {
-                    const existingContent = await fs.promises.readFile(fullFilename, 'utf8');
-                    exists = true;
-                    if (existingContent === data) {
-                        console.log('[no change] ' + fullFilename);
-                        return;
-                    }
-                } catch (e) {
-                    // ok
+                const existingFile = await readExistingGenerationResultFile(fullFilename);
+                if (existingFile.data === data) {
+                    console.log('[no change] ' + fullFilename);
+                    return;
                 }
                 await fs.promises.writeFile(fullFilename, data);
-                console.log(`[${exists ? 'updated' : 'created'}] ${fullFilename}`);
+                console.log(`[${existingFile.exists ? 'updated' : 'created'}] ${fullFilename}`);
             } catch (e) {
                 throw new Error(`Could not save file "${fullFilename}": ${e instanceof Error ? e.message : e}.`);
             }

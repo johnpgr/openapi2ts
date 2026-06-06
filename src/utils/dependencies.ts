@@ -1,4 +1,3 @@
-import {isImportSpecifier} from '../emit/type-guards.ts';
 import { identifier, importDeclaration, importDefaultSpecifier, importSpecifier, stringLiteral, tsNullKeyword } from '../emit/index.ts';
 import type { ImportDeclaration } from '../emit/index.ts';
 import {omit} from './collections.ts';
@@ -109,5 +108,3 @@ export function extendDependencyImports(dependencyImports: DependencyImports, ex
         }
     }
 }
-
-export {isImportSpecifier};

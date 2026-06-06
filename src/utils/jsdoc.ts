@@ -1,5 +1,4 @@
 import ts from 'typescript';
-import {isTSPropertySignature} from '../emit/type-guards.ts';
 import {wordWrap} from './string-utils.ts';
 import type { AnnotatedApiEntity } from '../schema-to-typescript/common.ts';
 import type { OpenApiClientGeneratorConfig } from '../schema-to-typescript/openapi-to-typescript-client.ts';
@@ -188,64 +187,3 @@ export function attachJsDocComment<T extends ts.Node>(node: T, jsdoc: string | n
     ) as T;
 }
 
-export function extractJsDocString(entity: AnnotatedApiEntity | boolean, params: JsDocBlockTag[] = []): string | null {
-    const jsdoc = extractJsDoc(entity);
-    jsdoc.tags = jsdoc.tags.concat(params);
-    return renderJsDoc(jsdoc);
-}
-
-export function isJsDocComment(comment: string): boolean {
-    return comment.startsWith('*');
-}
-
-export function parseJsDoc(comment: string): JsDocBlock {
-    const lines = comment
-        .replace(/(?:\r\n|\r|\n|^)\s*\* ?/g, '\n')
-        .trim()
-        .split(/\n/);
-    const result: JsDocBlock = {tags: []};
-
-    while (lines.length > 0) {
-        const line = lines[0];
-        if (!line.trim() && result.title) {
-            break;
-        }
-        if (line.startsWith('@')) {
-            break;
-        }
-        result.title = result.title ? `${result.title}\n${line}` : line;
-        lines.shift();
-    }
-
-    while (lines.length > 0) {
-        const line = lines[0];
-        if (line.startsWith('@')) {
-            break;
-        }
-        result.description = result.description ? `${result.description}\n${line}` : line;
-        lines.shift();
-    }
-
-    let currentTag: JsDocBlockTag | null = null;
-    while (lines.length > 0) {
-        const line = lines.shift()!;
-        const match = line.match(/^@(\S+)\s*(.*)?$/);
-        if (match) {
-            const name = match[1];
-            const value = match[2] && match[2].trim();
-            currentTag = {
-                name,
-                value: value || undefined
-            };
-            result.tags.push(currentTag);
-        } else if (currentTag) {
-            currentTag.value = currentTag.value ? `${currentTag.value}\n${line}` : line;
-        } else {
-            throw new Error(`Unexpected JsDoc tag: ${line}`);
-        }
-    }
-
-    return result;
-}
-
-export {isTSPropertySignature};

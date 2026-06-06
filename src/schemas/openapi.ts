@@ -240,10 +240,6 @@ export interface OpenApiOAuthFlow {
     scopes: Record<string, string>;
 }
 
-export function isOpenApiDocument(document: unknown): document is OpenApiDocument {
-    return typeof document === 'object' && document !== null && 'openapi' in document;
-}
-
 /**
  * List of HTTP methods defined by OpenAPI.
  */

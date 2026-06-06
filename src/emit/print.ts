@@ -59,17 +59,3 @@ export function cloneTypeElement<T extends ts.TypeElement>(element: T): T {
     const typeLiteral = (parsed.statements[0] as ts.TypeAliasDeclaration).type as ts.TypeLiteralNode;
     return typeLiteral.members[0] as T;
 }
-
-export function cloneTypeLiteral(typeLiteral: ts.TypeLiteralNode | import('./compat').MutableTypeLiteral): ts.TypeLiteralNode {
-    const finalized = finalizeType(typeLiteral);
-    const printer = ts.createPrinter({newLine: ts.NewLineKind.LineFeed});
-    const alias = ts.factory.createTypeAliasDeclaration(undefined, '_', undefined, finalized);
-    const sourceFile = ts.factory.createSourceFile(
-        [alias],
-        ts.factory.createToken(ts.SyntaxKind.EndOfFileToken),
-        ts.NodeFlags.None
-    );
-    const text = printer.printNode(ts.EmitHint.Unspecified, alias, sourceFile);
-    const parsed = ts.createSourceFile('clone.ts', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-    return (parsed.statements[0] as ts.TypeAliasDeclaration).type as ts.TypeLiteralNode;
-}

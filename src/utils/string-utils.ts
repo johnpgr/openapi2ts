@@ -2,10 +2,6 @@ export function ucFirst(input: string) {
     return input[0].toUpperCase() + input.slice(1);
 }
 
-export function lcFirst(input: string) {
-    return input[0].toLowerCase() + input.slice(1);
-}
-
 export type EntityNameCase = 'kebabCase' | 'camelCase' | 'snakeCase' | 'pascalCase';
 
 export interface FilenameFormat {
@@ -60,7 +56,7 @@ export function formatFilename(
     return `${prefix}${applyEntityNameCase(input, filenameCase)}${postfix}${extension}`;
 }
 
-export function rTrim(input: string): string {
+function rTrim(input: string): string {
     return input.replace(/\s+$/, '');
 }
 

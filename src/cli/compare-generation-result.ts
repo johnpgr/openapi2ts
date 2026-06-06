@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import {indexBy} from '../utils/collections.ts';
 import type { ClientGenerationResultFile } from '../schema-to-typescript/config.ts';
+import {indexGenerationResultFiles, readExistingGenerationResultFile, resolveGenerationResultFile} from './generation-result-files.ts';
 
 export async function compareGenerationResult({
     files,
@@ -13,7 +13,7 @@ export async function compareGenerationResult({
     cleanupDirectories: string[];
 }): Promise<boolean> {
     let hasChanges = false;
-    const filesIndex = indexBy(files, ({filename}) => path.resolve(outputDirPath, filename));
+    const filesIndex = indexGenerationResultFiles(files, outputDirPath);
     await Promise.all([
         ...cleanupDirectories.map(async (directoryRelativePath) => {
             const directoryPath = path.resolve(outputDirPath, directoryRelativePath);
@@ -34,19 +34,13 @@ export async function compareGenerationResult({
             }
         }),
         ...files.map(async ({filename, data}) => {
-            const fullFilename = path.resolve(outputDirPath, filename);
-            let exists = false;
-            try {
-                const existingContent = await fs.promises.readFile(fullFilename, 'utf8');
-                exists = true;
-                if (existingContent === data) {
-                    return;
-                }
-            } catch (e) {
-                // ok
+            const fullFilename = resolveGenerationResultFile(outputDirPath, filename);
+            const existingFile = await readExistingGenerationResultFile(fullFilename);
+            if (existingFile.data === data) {
+                return;
             }
             hasChanges = true;
-            console.log(`[${exists ? 'to-be-updated' : 'to-be-created'}] ${fullFilename}`);
+            console.log(`[${existingFile.exists ? 'to-be-updated' : 'to-be-created'}] ${fullFilename}`);
         })
     ]);
     return !hasChanges;

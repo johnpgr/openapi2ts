@@ -1,4 +1,4 @@
-import { arrayExpression, booleanLiteral, identifier, isValidIdentifier, nullLiteral, numericLiteral, objectExpression, objectProperty, objectPropertyKey, stringLiteral, tsArrayType, tsBooleanKeyword, tsIndexSignature, tsIntersectionType, tsLiteralType, tsNeverKeyword, tsNullKeyword, tsNumberKeyword, tsPropertySignature, tsRestType, tsStringKeyword, tsTupleType, tsTypeAnnotation, tsTypeLiteral, tsTypeReference, tsUnionType, tsUnknownKeyword, attachTypeAnnotation } from '../emit/index.ts';
+import { arrayExpression, booleanLiteral, identifier, nullLiteral, numericLiteral, objectExpression, objectProperty, objectPropertyKey, stringLiteral, tsArrayType, tsBooleanKeyword, tsIndexSignature, tsIntersectionType, tsLiteralType, tsNeverKeyword, tsNullKeyword, tsNumberKeyword, tsPropertySignature, tsRestType, tsStringKeyword, tsTupleType, tsTypeAnnotation, tsTypeLiteral, tsTypeReference, tsUnionType, tsUnknownKeyword, attachTypeAnnotation } from '../emit/index.ts';
 import type { Expression, Identifier, NumericLiteral, Statement, StringLiteral, TSType, TSTypeAnnotation } from '../emit/index.ts';
 import { printStatements } from '../emit/print.ts';
 import type { CommentsRenderConfig } from '../emit/print.ts';
@@ -27,6 +27,8 @@ export interface GenerateSchemaTypeParams {
     jsDocRenderConfig?: JsDocRenderConfig;
 }
 
+type GenerateSchemaTypeContext = Omit<GenerateSchemaTypeParams, 'schema' | 'expand'>;
+
 export function generateSchemaType({
     schema: originalSchema,
     getTypeName,
@@ -37,7 +39,7 @@ export function generateSchemaType({
     jsDocRenderConfig
 }: GenerateSchemaTypeParams): TSType {
     const schema = cleanupSchema(originalSchema);
-    const commonSchemaGenerationOptions = {
+    const context = {
         getTypeName,
         getBinaryType,
         processJsDoc,
@@ -51,58 +53,26 @@ export function generateSchemaType({
         return tsNeverKeyword();
     }
     if (schema.nullable) {
-        return simplifyUnionTypeIfPossible(
-            tsUnionType([
-                generateSchemaType({
-                    schema: Object.assign({}, schema, {nullable: false}),
-                    ...commonSchemaGenerationOptions
-                }),
-                tsNullKeyword()
-            ])
-        );
+        return generateNullableSchemaType(schema, context);
     }
     if (!expand && isNamedSchema(schema)) {
         return tsTypeReference(identifier(getTypeName(schema.name, schema)));
     }
     if (Array.isArray(schema.type)) {
-        const {type: _type, ...flatSchema} = schema;
-        return simplifyUnionTypeIfPossible(
-            tsUnionType(
-                schema.type.map((schemaType) =>
-                    generateSchemaType({schema: {...flatSchema, type: schemaType}, ...commonSchemaGenerationOptions})
-                )
-            )
+        return generateSchemaTypeUnion(
+            schema,
+            context,
+            schema.type.map((schemaType) => ({type: schemaType}))
         );
     }
     if ('oneOf' in schema && schema.oneOf) {
-        const {oneOf: _oneOf, ...flatSchema} = schema;
-        return simplifyUnionTypeIfPossible(
-            tsUnionType(
-                schema.oneOf.map((subSchema) =>
-                    generateSchemaType({schema: extendSchema(flatSchema, subSchema), ...commonSchemaGenerationOptions})
-                )
-            )
-        );
+        return generateSchemaTypeUnion(schema, context, schema.oneOf, 'oneOf');
     }
     if ('anyOf' in schema && schema.anyOf) {
-        const {anyOf: _anyOf, ...flatSchema} = schema;
-        return simplifyUnionTypeIfPossible(
-            tsUnionType(
-                schema.anyOf.map((subSchema) =>
-                    generateSchemaType({schema: extendSchema(flatSchema, subSchema), ...commonSchemaGenerationOptions})
-                )
-            )
-        );
+        return generateSchemaTypeUnion(schema, context, schema.anyOf, 'anyOf');
     }
     if ('allOf' in schema && schema.allOf) {
-        const {allOf: _allOf, ...flatSchema} = schema;
-        return simplifyIntersectionTypeIfPossible(
-            tsIntersectionType(
-                schema.allOf.map((subSchema) =>
-                    generateSchemaType({schema: extendSchema(flatSchema, subSchema), ...commonSchemaGenerationOptions})
-                )
-            )
-        );
+        return generateSchemaTypeIntersection(schema, context);
     }
     if (schema.const !== undefined) {
         return primitiveValueToType(schema.const);
@@ -126,105 +96,161 @@ export function generateSchemaType({
         return tsNumberKeyword();
     }
     if (schema.type === 'array') {
-        if (schema.prefixItems) {
-            return tsTupleType([
-                ...schema.prefixItems.map((item) =>
-                    generateSchemaType({schema: item, ...commonSchemaGenerationOptions})
-                ),
-                ...(schema.items !== false
-                    ? [
-                          tsRestType(
-                              tsArrayType(
-                                  generateSchemaType({
-                                      schema: schema.items ?? true,
-                                      ...commonSchemaGenerationOptions
-                                  })
-                              )
-                          )
-                      ]
-                    : [])
-            ]);
-        }
-        return tsArrayType(generateSchemaType({schema: schema.items ?? true, ...commonSchemaGenerationOptions}));
+        return generateArraySchemaType(schema, context);
     }
     if (schema.type === 'object') {
-        const objectIntersection: TSType[] = [];
-
-        if (schema.properties) {
-            const requiredFieldsIndex = (schema.required ?? []).reduce(
-                (res, fieldName) => {
-                    res[fieldName] = true;
-                    return res;
-                },
-                {} as Record<string, boolean>
-            );
-            objectIntersection.push(
-                tsTypeLiteral(
-                    Object.entries(schema.properties).map(([fieldName, fieldSchema]) => {
-                        let jsdoc = extractJsDoc(fieldSchema);
-                        const currentProcessJsDocPath = (processJsDocPath ?? []).concat(fieldName);
-                        if (processJsDoc) {
-                            jsdoc = processJsDoc(jsdoc, fieldSchema, currentProcessJsDocPath);
-                        }
-                        return attachJsDocComment(
-                            tsPropertySignature(
-                                objectPropertyKey(fieldName),
-                                tsTypeAnnotation(
-                                    generateSchemaType({
-                                        schema: fieldSchema,
-                                        ...commonSchemaGenerationOptions,
-                                        processJsDocPath: currentProcessJsDocPath
-                                    })
-                                ),
-                                !requiredFieldsIndex[fieldName]
-                            ),
-                            renderJsDoc(jsdoc, jsDocRenderConfig)
-                        );
-                    })
-                )
-            );
-        }
-
-        const additionalProperties = schema.additionalProperties ?? true;
-        if (additionalProperties !== false) {
-            let keyName = 'key';
-            if (typeof additionalProperties === 'object' && additionalProperties.title) {
-                keyName = applyEntityNameCase(additionalProperties.title, 'camelCase');
-            }
-            let jsdoc = extractJsDoc(additionalProperties);
-            const currentProcessJsDocPath = (processJsDocPath ?? []).concat(stringIndexSignature);
-            if (processJsDoc) {
-                jsdoc = processJsDoc(jsdoc, additionalProperties, currentProcessJsDocPath);
-            }
-            objectIntersection.push(
-                tsTypeLiteral([
-                    attachJsDocComment(
-                        tsIndexSignature(
-                            keyName,
-                            tsStringKeyword(),
-                            generateSchemaType({
-                                schema: additionalProperties,
-                                ...commonSchemaGenerationOptions,
-                                processJsDocPath: currentProcessJsDocPath
-                            })
-                        ),
-                        renderJsDoc(jsdoc, jsDocRenderConfig)
-                    )
-                ])
-            );
-        }
-
-        if (objectIntersection.length === 0) {
-            return tsTypeLiteral([]);
-        }
-
-        return simplifyIntersectionTypeIfPossible(tsIntersectionType(objectIntersection));
+        return generateObjectSchemaType(schema, context);
     }
     return tsUnknownKeyword();
 }
 
-export function unionTypeIfNecessary(types: TSType[]): TSType {
-    return types.length > 1 ? tsUnionType(types) : types[0];
+function generateNullableSchemaType(schema: OpenApiExpandedSchema, context: GenerateSchemaTypeContext): TSType {
+    return simplifyUnionTypeIfPossible(
+        tsUnionType([
+            generateSchemaType({
+                schema: Object.assign({}, schema, {nullable: false}),
+                ...context
+            }),
+            tsNullKeyword()
+        ])
+    );
+}
+
+function generateSchemaTypeUnion(
+    schema: OpenApiExpandedSchema,
+    context: GenerateSchemaTypeContext,
+    subSchemas: OpenApiSchema[],
+    compositionKey?: 'oneOf' | 'anyOf'
+): TSType {
+    const flatSchema = {...schema};
+    if (compositionKey) {
+        delete flatSchema[compositionKey];
+    } else {
+        delete flatSchema.type;
+    }
+    return simplifyUnionTypeIfPossible(
+        tsUnionType(
+            subSchemas.map((subSchema) =>
+                generateSchemaType({schema: extendSchema(flatSchema, subSchema), ...context})
+            )
+        )
+    );
+}
+
+function generateSchemaTypeIntersection(schema: OpenApiExpandedSchema, context: GenerateSchemaTypeContext): TSType {
+    const {allOf: _allOf, ...flatSchema} = schema;
+    return simplifyIntersectionTypeIfPossible(
+        tsIntersectionType(
+            (schema.allOf ?? []).map((subSchema) =>
+                generateSchemaType({schema: extendSchema(flatSchema, subSchema), ...context})
+            )
+        )
+    );
+}
+
+function generateArraySchemaType(schema: OpenApiExpandedSchema, context: GenerateSchemaTypeContext): TSType {
+    if (!schema.prefixItems) {
+        return tsArrayType(generateSchemaType({schema: schema.items ?? true, ...context}));
+    }
+    return tsTupleType([
+        ...schema.prefixItems.map((item) => generateSchemaType({schema: item, ...context})),
+        ...(schema.items !== false
+            ? [
+                  tsRestType(
+                      tsArrayType(
+                          generateSchemaType({
+                              schema: schema.items ?? true,
+                              ...context
+                          })
+                      )
+                  )
+              ]
+            : [])
+    ]);
+}
+
+function generateObjectSchemaType(schema: OpenApiExpandedSchema, context: GenerateSchemaTypeContext): TSType {
+    const objectIntersection = [
+        ...(schema.properties ? [generateObjectPropertiesType(schema, context)] : []),
+        ...generateAdditionalPropertiesTypes(schema, context)
+    ];
+
+    if (objectIntersection.length === 0) {
+        return tsTypeLiteral([]);
+    }
+
+    return simplifyIntersectionTypeIfPossible(tsIntersectionType(objectIntersection));
+}
+
+function generateObjectPropertiesType(schema: OpenApiExpandedSchema, context: GenerateSchemaTypeContext): TSType {
+    const requiredFieldsIndex = (schema.required ?? []).reduce(
+        (res, fieldName) => {
+            res[fieldName] = true;
+            return res;
+        },
+        {} as Record<string, boolean>
+    );
+    return tsTypeLiteral(
+        Object.entries(schema.properties ?? {}).map(([fieldName, fieldSchema]) => {
+            const currentProcessJsDocPath = (context.processJsDocPath ?? []).concat(fieldName);
+            const jsdoc = processSchemaJsDoc(fieldSchema, currentProcessJsDocPath, context);
+            return attachJsDocComment(
+                tsPropertySignature(
+                    objectPropertyKey(fieldName),
+                    tsTypeAnnotation(
+                        generateSchemaType({
+                            schema: fieldSchema,
+                            ...context,
+                            processJsDocPath: currentProcessJsDocPath
+                        })
+                    ),
+                    !requiredFieldsIndex[fieldName]
+                ),
+                renderJsDoc(jsdoc, context.jsDocRenderConfig)
+            );
+        })
+    );
+}
+
+function generateAdditionalPropertiesTypes(
+    schema: OpenApiExpandedSchema,
+    context: GenerateSchemaTypeContext
+): TSType[] {
+    const additionalProperties = schema.additionalProperties ?? true;
+    if (additionalProperties === false) {
+        return [];
+    }
+    const keyName =
+        typeof additionalProperties === 'object' && additionalProperties.title
+            ? applyEntityNameCase(additionalProperties.title, 'camelCase')
+            : 'key';
+    const currentProcessJsDocPath = (context.processJsDocPath ?? []).concat(stringIndexSignature);
+    const jsdoc = processSchemaJsDoc(additionalProperties, currentProcessJsDocPath, context);
+    return [
+        tsTypeLiteral([
+            attachJsDocComment(
+                tsIndexSignature(
+                    keyName,
+                    tsStringKeyword(),
+                    generateSchemaType({
+                        schema: additionalProperties,
+                        ...context,
+                        processJsDocPath: currentProcessJsDocPath
+                    })
+                ),
+                renderJsDoc(jsdoc, context.jsDocRenderConfig)
+            )
+        ])
+    ];
+}
+
+function processSchemaJsDoc(
+    schema: OpenApiSchema,
+    path: OpenApiSchemaFieldPathItem[],
+    {processJsDoc}: GenerateSchemaTypeContext
+) {
+    const jsdoc = extractJsDoc(schema);
+    return processJsDoc ? processJsDoc(jsdoc, schema, path) : jsdoc;
 }
 
 export interface AnnotatedApiEntity {
@@ -235,7 +261,7 @@ export interface AnnotatedApiEntity {
     deprecated?: boolean;
 }
 
-export function primitiveValueToType(value: OpenApiSchemaPrimitiveValue): TSType {
+function primitiveValueToType(value: OpenApiSchemaPrimitiveValue): TSType {
     if (typeof value === 'string') {
         return tsLiteralType(stringLiteral(value));
     }
@@ -284,8 +310,4 @@ export type {CommentsRenderConfig};
 
 export function renderTypeScript(statements: Statement[], commentsConfig: CommentsRenderConfig = {}): string {
     return printStatements(statements, commentsConfig);
-}
-
-export function isValidIdentifierName(name: string, allowReserved?: boolean): boolean {
-    return isValidIdentifier(name, allowReserved);
 }

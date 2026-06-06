@@ -120,17 +120,6 @@ export function objectPatternProperty(
 
 export {assignmentPattern} from './compat.ts';
 
-export function setPropertyReturnType(property: ts.PropertyDeclaration, type: CompatType): ts.PropertyDeclaration {
-    return ts.factory.updatePropertyDeclaration(
-        property,
-        property.modifiers,
-        property.name,
-        property.questionToken,
-        finalizeType(type),
-        property.initializer
-    );
-}
-
 export function setArrowFunctionReturnType(arrow: ts.ArrowFunction, type: CompatType): ts.ArrowFunction {
     return ts.factory.updateArrowFunction(
         arrow,
@@ -226,7 +215,7 @@ export function parameterDeclaration(
         initializer === undefined ? undefined : finalizeExpression(initializer)
     );
 }
-export function createPatternParameter(pattern: MutableObjectPattern, initializer?: CompatExpression): ts.ParameterDeclaration {
+function createPatternParameter(pattern: MutableObjectPattern, initializer?: CompatExpression): ts.ParameterDeclaration {
     return ts.factory.createParameterDeclaration(
         undefined,
         undefined,
@@ -260,14 +249,6 @@ export function arrowFunctionExpression(
         : [createPatternParameter(params as MutableObjectPattern, defaultParameterInitializer ? finalizeExpression(defaultParameterInitializer) : undefined)];
     const modifiers = isAsync ? [ts.factory.createModifier(ts.SyntaxKind.AsyncKeyword)] : undefined;
     return ts.factory.createArrowFunction(modifiers, undefined, parameters, undefined, undefined, body);
-}
-
-export function functionDeclaration(
-    name: ts.Identifier,
-    params: readonly ts.ParameterDeclaration[],
-    body: ts.Block
-): ts.FunctionDeclaration {
-    return ts.factory.createFunctionDeclaration(undefined, undefined, name, undefined, [...params], undefined, body);
 }
 
 export type ClassBody = ts.ClassElement[];
@@ -360,7 +341,7 @@ export function importNamespaceSpecifier(local: ts.Identifier): ts.NamespaceImpo
     return ts.factory.createNamespaceImport(local);
 }
 
-export function isImportDefaultSpecifier(
+function isImportDefaultSpecifier(
     value: unknown
 ): value is ImportDefaultSpecifierLike {
     return (

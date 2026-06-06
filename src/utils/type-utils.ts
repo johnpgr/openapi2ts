@@ -1,3 +1,4 @@
+import type ts from 'typescript';
 import { isBooleanLiteral, isIdentifier, isNumericLiteral, isStringLiteral, isTSCallSignatureDeclaration, isTSConstructSignatureDeclaration, isTSIntersectionType, isTSLiteralTypeNode, isTSMethodSignature, isTSPropertySignature, isTSTypeLiteral, isTSUnionType, tsBooleanKeyword, tsIntersectionType, tsPropertySignature, tsTypeAnnotation, tsTypeLiteral, tsUnionType } from '../emit/index.ts';
 import type { TSIntersectionType, TSPropertySignature, TSType, TSTypeLiteral, TSUnionType } from '../emit/index.ts';
 import {cloneTypeElement, typeNodesEqual} from '../emit/print.ts';
@@ -60,96 +61,123 @@ function getPropertyKey(member: TSPropertySignature): string | undefined {
             : undefined;
 }
 
-export function simplifyUnionTypeIfPossible(union: TSUnionType): TSType {
-    const result: TSUnionType = tsUnionType([]);
-    const itemsToProcess: TSType[] = [...flattenUnions(union).types];
+type CompositeType = TSUnionType | TSIntersectionType;
 
+type PairMergeResult =
+    | {kind: 'merged'; current: TSType}
+    | {kind: 'unchanged'};
+
+function simplifyCompositeTypeIfPossible<T extends CompositeType>(
+    composite: T,
+    flatten: (value: T) => T,
+    createComposite: (types: TSType[]) => T,
+    tryMergePair: (current: TSType, compared: TSType) => PairMergeResult
+): TSType {
+    const itemsToProcess: TSType[] = [...flatten(composite).types];
+    const resultTypes: TSType[] = [];
     let hasChanges = false;
 
     while (itemsToProcess.length > 0) {
         let current = itemsToProcess.shift()!;
         for (let i = 0; i < itemsToProcess.length; i++) {
             const compared = itemsToProcess[i];
-            if (typeNodesEqual(current, compared)) {
+            const mergeResult = tryMergePair(current, compared);
+            if (mergeResult.kind === 'merged') {
+                current = mergeResult.current;
                 itemsToProcess.splice(i, 1);
                 i--;
                 hasChanges = true;
-            } else if (
+            }
+        }
+        resultTypes.push(current);
+    }
+
+    if (resultTypes.length === 1) {
+        return resultTypes[0];
+    }
+    if (hasChanges) {
+        return createComposite(resultTypes);
+    }
+    return composite;
+}
+
+function mergeUnionTypeLiteralsWithOneDifference(current: TSTypeLiteral, compared: TSTypeLiteral): TSTypeLiteral | null {
+    if (current.members.length !== compared.members.length) {
+        return null;
+    }
+    const currentProperties = getTypeProperties(current);
+    if (Object.keys(currentProperties).length !== current.members.length) {
+        return null;
+    }
+    const comparedProperties = getTypeProperties(compared);
+    if (Object.keys(comparedProperties).length !== compared.members.length) {
+        return null;
+    }
+    const currentKeys = Object.keys(currentProperties).sort();
+    const comparedKeys = Object.keys(comparedProperties).sort();
+    if (currentKeys.join('\0') !== comparedKeys.join('\0')) {
+        return null;
+    }
+    const keysWithDifferences = currentKeys.filter(
+        (key) => !typeNodesEqual(currentProperties[key].type!, comparedProperties[key].type!)
+    );
+    if (keysWithDifferences.length !== 1) {
+        return null;
+    }
+    const [keyWithDifference] = keysWithDifferences;
+    return tsTypeLiteral(
+        current.members.map((member: ts.TypeElement) => {
+            if (isTSPropertySignature(member)) {
+                const key = getPropertyKey(member);
+                if (key === keyWithDifference) {
+                    return tsPropertySignature(
+                        member.name,
+                        tsTypeAnnotation(
+                            simplifyUnionTypeIfPossible(
+                                flattenUnions(
+                                    tsUnionType([
+                                        currentProperties[keyWithDifference].type!,
+                                        comparedProperties[keyWithDifference].type!
+                                    ])
+                                )
+                            )
+                        ),
+                        member.questionToken !== undefined
+                    );
+                }
+            }
+            return member;
+        })
+    );
+}
+
+export function simplifyUnionTypeIfPossible(union: TSUnionType): TSType {
+    return simplifyCompositeTypeIfPossible(
+        union,
+        flattenUnions,
+        (types) => tsUnionType(types),
+        (current, compared) => {
+            if (typeNodesEqual(current, compared)) {
+                return {kind: 'merged', current};
+            }
+            if (
                 isTSLiteralTypeNode(current) &&
                 isTSLiteralTypeNode(compared) &&
                 isBooleanLiteral(current.literal) &&
                 isBooleanLiteral(compared.literal) &&
                 current.literal.kind !== compared.literal.kind
             ) {
-                current = tsBooleanKeyword();
-                itemsToProcess.splice(i, 1);
-                i--;
-                hasChanges = true;
-            } else if (isTSTypeLiteral(current) && isTSTypeLiteral(compared)) {
-                if (current.members.length !== compared.members.length) {
-                    continue;
-                }
-                const currentProperties = getTypeProperties(current);
-                if (Object.keys(currentProperties).length !== current.members.length) {
-                    continue;
-                }
-                const comparedProperties = getTypeProperties(compared);
-                if (Object.keys(comparedProperties).length !== compared.members.length) {
-                    continue;
-                }
-                const currentKeys = Object.keys(currentProperties).sort();
-                const comparedKeys = Object.keys(comparedProperties).sort();
-                if (currentKeys.join('\0') !== comparedKeys.join('\0')) {
-                    continue;
-                }
-                const keysWithDifferences = currentKeys.filter(
-                    (key) =>
-                        !typeNodesEqual(
-                            currentProperties[key].type!,
-                            comparedProperties[key].type!
-                        )
-                );
-                if (keysWithDifferences.length === 1) {
-                    const [keyWithDifference] = keysWithDifferences;
-                    current = tsTypeLiteral(
-                        current.members.map((member) => {
-                            if (isTSPropertySignature(member)) {
-                                const key = getPropertyKey(member);
-                                if (key === keyWithDifference) {
-                                    return tsPropertySignature(
-                                        member.name,
-                                        tsTypeAnnotation(
-                                            simplifyUnionTypeIfPossible(
-                                                flattenUnions(
-                                                    tsUnionType([
-                                                        currentProperties[keyWithDifference].type!,
-                                                        comparedProperties[keyWithDifference].type!
-                                                    ])
-                                                )
-                                            )
-                                        ),
-                                        member.questionToken !== undefined
-                                    );
-                                }
-                            }
-                            return member;
-                        })
-                    );
-                    itemsToProcess.splice(i, 1);
-                    i--;
-                    hasChanges = true;
+                return {kind: 'merged', current: tsBooleanKeyword()};
+            }
+            if (isTSTypeLiteral(current) && isTSTypeLiteral(compared)) {
+                const merged = mergeUnionTypeLiteralsWithOneDifference(current, compared);
+                if (merged) {
+                    return {kind: 'merged', current: merged};
                 }
             }
+            return {kind: 'unchanged'};
         }
-        result.types.push(current);
-    }
-    if (result.types.length === 1) {
-        return result.types[0];
-    }
-    if (hasChanges) {
-        return result;
-    }
-    return union;
+    );
 }
 
 function simplePluralize(word: string): string {
@@ -209,38 +237,23 @@ function mergeTypeLiteralsIfPossible(first: TSTypeLiteral, second: TSTypeLiteral
 }
 
 export function simplifyIntersectionTypeIfPossible(intersection: TSIntersectionType): TSType {
-    const result: TSIntersectionType = tsIntersectionType([]);
-    const itemsToProcess: TSType[] = [...flattenIntersections(intersection).types];
-
-    let hasChanges = false;
-
-    while (itemsToProcess.length > 0) {
-        let current = itemsToProcess.shift()!;
-        for (let i = 0; i < itemsToProcess.length; i++) {
-            const compared = itemsToProcess[i];
+    return simplifyCompositeTypeIfPossible(
+        intersection,
+        flattenIntersections,
+        (types) => tsIntersectionType(types),
+        (current, compared) => {
             if (typeNodesEqual(current, compared)) {
-                itemsToProcess.splice(i, 1);
-                i--;
-                hasChanges = true;
-            } else if (isTSTypeLiteral(current) && isTSTypeLiteral(compared)) {
+                return {kind: 'merged', current};
+            }
+            if (isTSTypeLiteral(current) && isTSTypeLiteral(compared)) {
                 const merged = mergeTypeLiteralsIfPossible(current, compared);
                 if (merged) {
-                    current = merged;
-                    itemsToProcess.splice(i, 1);
-                    i--;
-                    hasChanges = true;
+                    return {kind: 'merged', current: merged};
                 }
             }
+            return {kind: 'unchanged'};
         }
-        result.types.push(current);
-    }
-    if (result.types.length === 1) {
-        return result.types[0];
-    }
-    if (hasChanges) {
-        return result;
-    }
-    return intersection;
+    );
 }
 
 export function isAssignableToEmptyObject(type: TSType): boolean {

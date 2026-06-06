@@ -41,15 +41,15 @@ export interface MutableTypeLiteral {
 export type CompatExpression = ts.Expression | MutableObjectExpression | MutableAssignmentPattern;
 export type CompatType = ts.TypeNode | MutableUnionType | MutableIntersectionType | MutableTypeLiteral;
 
-export function isMutableObjectExpression(value: unknown): value is MutableObjectExpression {
+function isMutableObjectExpression(value: unknown): value is MutableObjectExpression {
     return typeof value === 'object' && value !== null && (value as MutableObjectExpression).kind === 'ObjectExpression';
 }
 
-export function isMutableObjectPattern(value: unknown): value is MutableObjectPattern {
+function isMutableObjectPattern(value: unknown): value is MutableObjectPattern {
     return typeof value === 'object' && value !== null && (value as MutableObjectPattern).kind === 'ObjectPattern';
 }
 
-export function isMutableAssignmentPattern(value: unknown): value is MutableAssignmentPattern {
+function isMutableAssignmentPattern(value: unknown): value is MutableAssignmentPattern {
     return typeof value === 'object' && value !== null && (value as MutableAssignmentPattern).kind === 'AssignmentPattern';
 }
 
@@ -63,24 +63,6 @@ export function isMutableIntersectionType(value: unknown): value is MutableInter
 
 export function isMutableTypeLiteral(value: unknown): value is MutableTypeLiteral {
     return typeof value === 'object' && value !== null && (value as MutableTypeLiteral).kind === 'TypeLiteral';
-}
-
-export function mutableObjectExpression(
-    properties: ts.ObjectLiteralElementLike[] = []
-): MutableObjectExpression {
-    return {kind: 'ObjectExpression', properties: [...properties]};
-}
-
-export function mutableObjectPattern(): MutableObjectPattern {
-    return {kind: 'ObjectPattern', properties: []};
-}
-
-export function mutableUnionType(types: ts.TypeNode[] = []): MutableUnionType {
-    return {kind: 'UnionType', types: [...types]};
-}
-
-export function mutableTypeLiteral(members: ts.TypeElement[] = []): MutableTypeLiteral {
-    return {kind: 'TypeLiteral', members: [...members]};
 }
 
 export function assignmentPattern(
@@ -144,8 +126,4 @@ export function finalizeType(type: CompatType): ts.TypeNode {
         return ts.factory.createTypeLiteralNode(type.members);
     }
     return type;
-}
-
-export function getIdentifierText(id: ts.Identifier | ts.PrivateIdentifier): string {
-    return id.text;
 }

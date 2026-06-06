@@ -1,13 +1,13 @@
-import { arrayExpression, arrowFunctionExpression, assignmentPattern, blockStatement, callExpression, classProperty, expressionStatement, identifier, isValidIdentifier, memberExpression, objectExpression, objectPattern, objectPatternProperty, objectProperty, returnStatement, setArrowFunctionReturnType, stringLiteral, thisExpression, tsLiteralType, tsPropertySignature, tsStringKeyword, tsTypeAnnotation, tsTypeLiteral, tsTypeParameterInstantiation, tsTypeReference, tsUndefinedKeyword, tsUnionType } from '../../emit/index.ts';
-import type { Expression, Identifier, TSType } from '../../emit/index.ts';
+import { arrowFunctionExpression, assignmentPattern, blockStatement, callExpression, classProperty, identifier, isValidIdentifier, memberExpression, objectExpression, objectPattern, objectPatternProperty, objectProperty, returnStatement, setArrowFunctionReturnType, stringLiteral, thisExpression, tsLiteralType, tsPropertySignature, tsStringKeyword, tsTypeAnnotation, tsTypeLiteral, tsTypeParameterInstantiation, tsTypeReference, tsUndefinedKeyword, tsUnionType } from '../../emit/index.ts';
+import type { ClassProperty, Expression, Identifier, TSType } from '../../emit/index.ts';
 import ts from 'typescript';
 import {uniq} from '../../utils/collections.ts';
 import {generateBinaryType} from './binary.ts';
 import type { GetModelData } from './models.ts';
 import {getOperationReturnType} from './operation-return.ts';
-import type { OpenApiParameter } from '../../schemas/common.ts';
+import type { OpenApiParameter, OpenApiSchema } from '../../schemas/common.ts';
 import { openApiHttpMethods } from '../../schemas/openapi.ts';
-import type { OpenApiMediaType, OpenApiPaths } from '../../schemas/openapi.ts';
+import type { OpenApiMediaType, OpenApiOperation, OpenApiPathItem, OpenApiPaths, OpenApiRequestBody } from '../../schemas/openapi.ts';
 import { extendDependenciesAndGetResult, extendDependencyImports, generateSchemaTypeAndImports } from '../../utils/dependencies.ts';
 import type { DependencyImports } from '../../utils/dependencies.ts';
 import { attachJsDocComment, extractJsDoc, renderJsDoc } from '../../utils/jsdoc.ts';
@@ -68,6 +68,67 @@ interface OpenApiParameterValue {
     value: Expression;
 }
 
+type OperationInputParameterLocation = Exclude<OpenApiParameter['in'], 'cookie'> | 'body';
+type OperationInputParameters = {
+    [K in OperationInputParameterLocation]: (OpenApiParameterFromArgument | OpenApiParameterValue)[];
+};
+type GenerateOperationParameterArgumentName = NonNullable<
+    OpenApiClientGeneratorConfig['operations']
+>['generateOperationParameterArgumentName'];
+type GenerateOperationParameterJsDoc = NonNullable<
+    OpenApiClientGeneratorConfig['operations']
+>['generateOperationParameterJsDoc'];
+type GenerateOperationRequestBodyArgumentName = NonNullable<
+    OpenApiClientGeneratorConfig['operations']
+>['generateOperationRequestBodyArgumentName'];
+type GenerateOperationRequestBodyJsDoc = NonNullable<
+    OpenApiClientGeneratorConfig['operations']
+>['generateOperationRequestBodyJsDoc'];
+type MediaTypeArgumentName = NonNullable<OpenApiClientGeneratorConfig['operations']>['mediaTypeArgumentName'];
+
+interface OperationMethodContext {
+    operation: OpenApiOperation;
+    pathItem: OpenApiPathItem;
+    path: string;
+    serviceName?: string;
+    httpMethod: string;
+    operationName: string;
+}
+
+interface SchemaTypeContext {
+    getModelData: GetModelData;
+    operationImportPath: string;
+    getBinaryType: () => TSType;
+    dependencyImports: DependencyImports;
+}
+
+interface JsDocContext {
+    jsDocRenderConfig: JsDocRenderConfig;
+}
+
+type OperationMethodSchemaContext = OperationMethodContext & SchemaTypeContext & JsDocContext;
+
+function createOperationInputParameters(): OperationInputParameters {
+    return {
+        path: [],
+        query: [],
+        header: [],
+        body: []
+    };
+}
+
+function generateSchemaType(schema: OpenApiSchema | boolean, context: SchemaTypeContext) {
+    return extendDependenciesAndGetResult(
+        generateSchemaTypeAndImports({
+            schema,
+            sourceImportPath: context.operationImportPath,
+            getModelData: context.getModelData,
+            getBinaryType: context.getBinaryType
+        }),
+        context.dependencyImports
+    );
+}
+
 function isOperationParameterFromArgument(
     value: OpenApiParameterFromArgument | OpenApiParameterValue
 ): value is OpenApiParameterFromArgument {
@@ -95,12 +156,446 @@ function generateDestructuringName(paramName: string, postfixes: string[], usedI
     return destructuringName;
 }
 
+function getParameterErrorLocation(param: OpenApiParameter, path: string, httpMethod: string) {
+    return (
+        `${JSON.stringify(param.name)} at path ` +
+        `${JSON.stringify(path)}, method ${httpMethod.toUpperCase()}: unsupported style :` +
+        JSON.stringify(param.style)
+    );
+}
+
+function createIncompatibleParameterStyleError(param: OpenApiParameter, path: string, httpMethod: string) {
+    return new Error(`Could not process parameter ${getParameterErrorLocation(param, path, httpMethod)}`);
+}
+
+function validateOperationParameter(
+    parameter: OpenApiParameter,
+    path: string,
+    httpMethod: string
+): asserts parameter is OpenApiParameter & {in: Exclude<OpenApiParameter['in'], 'cookie'>} {
+    if (parameter.in === 'path') {
+        if (parameter.style && parameter.style !== 'simple') {
+            throw createIncompatibleParameterStyleError(parameter, path, httpMethod);
+        }
+        if (!parameter.required) {
+            throw new Error(`Path parameters should be required: ${getParameterErrorLocation(parameter, path, httpMethod)}`);
+        }
+        return;
+    }
+    if (parameter.in === 'query') {
+        if (parameter.style && parameter.style !== 'form') {
+            throw createIncompatibleParameterStyleError(parameter, path, httpMethod);
+        }
+        return;
+    }
+    if (parameter.in === 'header') {
+        if (parameter.style && parameter.style !== 'simple') {
+            throw createIncompatibleParameterStyleError(parameter, path, httpMethod);
+        }
+        return;
+    }
+    if (parameter.in === 'cookie') {
+        throw new Error(`Parameters in cookies are not supported: ${getParameterErrorLocation(parameter, path, httpMethod)}`);
+    }
+    throw new Error(`Unknown parameter type ${parameter.in}: ${getParameterErrorLocation(parameter, path, httpMethod)}`);
+}
+
+function addOperationParameterInput({
+    inputParameters,
+    parameter,
+    operation,
+    pathItem,
+    path,
+    serviceName,
+    httpMethod,
+    operationName,
+    usedInputNames,
+    getModelData,
+    operationImportPath,
+    getBinaryType,
+    dependencyImports,
+    jsDocRenderConfig,
+    generateOperationParameterArgumentName,
+    generateOperationParameterJsDoc
+}: {
+    inputParameters: OperationInputParameters;
+    parameter: OpenApiParameter;
+    usedInputNames: Record<string, true>;
+    generateOperationParameterArgumentName?: GenerateOperationParameterArgumentName;
+    generateOperationParameterJsDoc?: GenerateOperationParameterJsDoc;
+} & OperationMethodSchemaContext) {
+    validateOperationParameter(parameter, path, httpMethod);
+
+    const schema = parameter.schema ?? true;
+    if (typeof schema !== 'boolean' && schema.const !== undefined) {
+        inputParameters[parameter.in].push({
+            paramName: parameter.name,
+            value: valueToAstExpression(schema.const)
+        });
+        return;
+    }
+
+    const suggestedParameterName = generateUniqueName(
+        parameter.name,
+        [parameter.in, `${parameter.in} param`],
+        usedInputNames
+    );
+    const parameterName = generateUniqueName(
+        generateOperationParameterArgumentName
+            ? generateOperationParameterArgumentName({
+                  operation,
+                  path,
+                  serviceName,
+                  parameter,
+                  pathItem,
+                  operationName,
+                  suggestedName: suggestedParameterName,
+                  httpMethod
+              })
+            : suggestedParameterName,
+        [],
+        usedInputNames
+    );
+    usedInputNames[parameterName] = true;
+    const paramJsDoc = extractJsDoc(parameter);
+    inputParameters[parameter.in].push({
+        paramName: parameter.name,
+        argumentName: parameterName,
+        destructuringName: generateDestructuringName(
+            parameterName,
+            [parameter.in, `${parameter.in} param`],
+            usedInputNames
+        ),
+        optional: !parameter.required,
+        type: generateSchemaType(schema, {getModelData, operationImportPath, getBinaryType, dependencyImports}),
+        docs: renderJsDoc(
+            generateOperationParameterJsDoc
+                ? generateOperationParameterJsDoc({
+                      suggestedJsDoc: paramJsDoc,
+                      operation,
+                      operationName,
+                      serviceName,
+                      parameter,
+                      pathItem,
+                      path,
+                      httpMethod
+                  })
+                : paramJsDoc,
+            jsDocRenderConfig
+        )
+    });
+}
+
+function getRequestBodyMediaTypes(requestBody: OpenApiRequestBody) {
+    const mediaTypes = Object.entries(requestBody.content).sort(([a], [b]) => a.localeCompare(b));
+    if (mediaTypes.length > 1) {
+        for (let i = 0; i < mediaTypes.length; i++) {
+            if (isWildcardMediaType(mediaTypes[i][0])) {
+                mediaTypes.splice(i, 1);
+            }
+        }
+    }
+    return mediaTypes;
+}
+
+function addMultiMediaTypeRequestBodyInputs({
+    inputParameters,
+    mediaTypesWithRequestBodyNames,
+    allRequestBodyNames,
+    mediaTypeName,
+    requestBody,
+    operation,
+    pathItem,
+    path,
+    serviceName,
+    httpMethod,
+    operationName,
+    usedInputNames,
+    getModelData,
+    operationImportPath,
+    getBinaryType,
+    dependencyImports,
+    jsDocRenderConfig,
+    generateOperationRequestBodyJsDoc
+}: {
+    inputParameters: OperationInputParameters;
+    mediaTypesWithRequestBodyNames: {mediaType: string; content: OpenApiMediaType; requestBodyName: string}[];
+    allRequestBodyNames: string[];
+    mediaTypeName: string;
+    requestBody: OpenApiRequestBody;
+    usedInputNames: Record<string, true>;
+    generateOperationRequestBodyJsDoc?: GenerateOperationRequestBodyJsDoc;
+} & OperationMethodSchemaContext) {
+    const additionUnion = tsUnionType([]);
+    let defaultMediaType: string | undefined;
+    for (const {mediaType, content, requestBodyName} of mediaTypesWithRequestBodyNames) {
+        const schema = content.schema ?? true;
+        let isDefaultType = false;
+        if (!defaultMediaType && isJsonMediaType(mediaType)) {
+            isDefaultType = true;
+            defaultMediaType = mediaType;
+        }
+        const mediaTypeArgumentType = isWildcardMediaType(mediaType)
+            ? tsStringKeyword()
+            : tsLiteralType(stringLiteral(mediaType));
+        const mediaTypePropertySignature = tsPropertySignature(
+            identifier(mediaTypeName),
+            tsTypeAnnotation(mediaTypeArgumentType),
+            isDefaultType
+        );
+        const jsdoc = extractJsDoc({...requestBody, ...content});
+        additionUnion.types.push(
+            tsTypeLiteral([
+                mediaTypePropertySignature,
+                ...allRequestBodyNames.map((requestBodyNameItem) => {
+                    const isCurrentRequestBody = requestBodyNameItem === requestBodyName;
+                    const property = attachJsDocComment(
+                        tsPropertySignature(
+                            identifier(requestBodyName),
+                            tsTypeAnnotation(
+                                isCurrentRequestBody
+                                    ? generateSchemaType(schema, {
+                                          getModelData,
+                                          operationImportPath,
+                                          getBinaryType,
+                                          dependencyImports
+                                      })
+                                    : tsUndefinedKeyword()
+                            )
+                        ),
+                        renderJsDoc(
+                            generateOperationRequestBodyJsDoc
+                                ? generateOperationRequestBodyJsDoc({
+                                      suggestedJsDoc: jsdoc,
+                                      serviceName,
+                                      operation,
+                                      pathItem,
+                                      operationName,
+                                      content,
+                                      requestBody,
+                                      path,
+                                      mediaType,
+                                      httpMethod
+                                  })
+                                : jsdoc,
+                            jsDocRenderConfig
+                        )
+                    );
+                    return tsPropertySignature(property.name, tsTypeAnnotation(property.type!), !isCurrentRequestBody);
+                })
+            ])
+        );
+    }
+    inputParameters['header'].push({
+        paramName: 'Content-Type',
+        argumentName: mediaTypeName,
+        destructuringName: generateDestructuringName(mediaTypeName, [], usedInputNames),
+        docs: null,
+        defaultValue: defaultMediaType ? stringLiteral(defaultMediaType) : undefined
+    });
+    for (const requestBodyName of allRequestBodyNames) {
+        inputParameters['body'].push({
+            argumentName: requestBodyName,
+            destructuringName: generateDestructuringName(requestBodyName, [], usedInputNames),
+            paramName: requestBodyName,
+            docs: null
+        });
+    }
+    return additionUnion;
+}
+
+function addSingleMediaTypeRequestBodyInputs({
+    inputParameters,
+    mediaType,
+    content,
+    requestBodyName,
+    mediaTypeName,
+    requestBody,
+    operation,
+    pathItem,
+    path,
+    serviceName,
+    httpMethod,
+    operationName,
+    usedInputNames,
+    getModelData,
+    operationImportPath,
+    getBinaryType,
+    dependencyImports,
+    jsDocRenderConfig,
+    generateOperationRequestBodyJsDoc
+}: {
+    inputParameters: OperationInputParameters;
+    mediaType: string;
+    content: OpenApiMediaType;
+    requestBodyName: string;
+    mediaTypeName: string;
+    requestBody: OpenApiRequestBody;
+    usedInputNames: Record<string, true>;
+    generateOperationRequestBodyJsDoc?: GenerateOperationRequestBodyJsDoc;
+} & OperationMethodSchemaContext) {
+    const schema = content.schema ?? true;
+    const jsdoc = extractJsDoc({...requestBody, ...content});
+    if (mediaType.includes('*')) {
+        inputParameters['header'].push({
+            paramName: 'Content-Type',
+            argumentName: mediaTypeName,
+            destructuringName: generateDestructuringName(mediaTypeName, [], usedInputNames),
+            docs: null,
+            type: tsStringKeyword()
+        });
+    } else {
+        inputParameters['header'].push({
+            paramName: 'Content-Type',
+            value: stringLiteral(mediaType)
+        });
+    }
+    inputParameters['body'].push({
+        paramName: requestBodyName,
+        argumentName: requestBodyName,
+        destructuringName: generateDestructuringName(requestBodyName, [], usedInputNames),
+        type: generateSchemaType(schema, {getModelData, operationImportPath, getBinaryType, dependencyImports}),
+        docs: renderJsDoc(
+            generateOperationRequestBodyJsDoc
+                ? generateOperationRequestBodyJsDoc({
+                      suggestedJsDoc: jsdoc,
+                      serviceName,
+                      operation,
+                      pathItem,
+                      operationName,
+                      content,
+                      requestBody,
+                      path,
+                      mediaType,
+                      httpMethod
+                  })
+                : jsdoc,
+            jsDocRenderConfig
+        )
+    });
+}
+
+function addRequestBodyInputs({
+    inputParameters,
+    requestBody,
+    operation,
+    pathItem,
+    path,
+    serviceName,
+    httpMethod,
+    operationName,
+    usedInputNames,
+    getModelData,
+    operationImportPath,
+    getBinaryType,
+    dependencyImports,
+    jsDocRenderConfig,
+    generateOperationRequestBodyArgumentName,
+    mediaTypeArgumentName,
+    generateOperationRequestBodyJsDoc
+}: {
+    inputParameters: OperationInputParameters;
+    requestBody: OpenApiRequestBody;
+    usedInputNames: Record<string, true>;
+    generateOperationRequestBodyArgumentName?: GenerateOperationRequestBodyArgumentName;
+    mediaTypeArgumentName?: MediaTypeArgumentName;
+    generateOperationRequestBodyJsDoc?: GenerateOperationRequestBodyJsDoc;
+} & OperationMethodSchemaContext): {requestBodyArgumentNames: string[]; argumentExtensionType?: TSType} {
+    inputParameters['body'] = [];
+    const mediaTypes = getRequestBodyMediaTypes(requestBody);
+    const mediaTypeName = generateUniqueName(mediaTypeArgumentName ?? 'mediaType', [], usedInputNames);
+    usedInputNames[mediaTypeName] = true;
+    const mediaTypesWithRequestBodyNames = mediaTypes.map(([mediaType, content]) => {
+        const requestBodySuggestedName = generateUniqueName(
+            getUserFreiendlySchemaName(content.schema ?? true) ?? 'request body',
+            [],
+            usedInputNames
+        );
+        return {
+            mediaType,
+            content,
+            requestBodyName: generateUniqueName(
+                generateOperationRequestBodyArgumentName
+                    ? generateOperationRequestBodyArgumentName({
+                          path,
+                          pathItem,
+                          operation,
+                          operationName,
+                          serviceName,
+                          content,
+                          requestBody,
+                          mediaType,
+                          suggestedName: requestBodySuggestedName,
+                          httpMethod
+                      })
+                    : requestBodySuggestedName,
+                [],
+                usedInputNames
+            )
+        };
+    });
+    const requestBodyArgumentNames = uniq(
+        mediaTypesWithRequestBodyNames.map(({requestBodyName}) => requestBodyName)
+    ).sort((a, b) => a.localeCompare(b));
+
+    if (mediaTypesWithRequestBodyNames.length > 1) {
+        return {
+            requestBodyArgumentNames,
+            argumentExtensionType: addMultiMediaTypeRequestBodyInputs({
+                inputParameters,
+                mediaTypesWithRequestBodyNames,
+                allRequestBodyNames: requestBodyArgumentNames,
+                mediaTypeName,
+                requestBody,
+                operation,
+                pathItem,
+                path,
+                serviceName,
+                httpMethod,
+                operationName,
+                usedInputNames,
+                getModelData,
+                operationImportPath,
+                getBinaryType,
+                dependencyImports,
+                jsDocRenderConfig,
+                generateOperationRequestBodyJsDoc
+            })
+        };
+    }
+    if (mediaTypesWithRequestBodyNames.length === 1) {
+        const [{mediaType, content, requestBodyName}] = mediaTypesWithRequestBodyNames;
+        addSingleMediaTypeRequestBodyInputs({
+            inputParameters,
+            mediaType,
+            content,
+            requestBodyName,
+            mediaTypeName,
+            requestBody,
+            operation,
+            pathItem,
+            path,
+            serviceName,
+            httpMethod,
+            operationName,
+            usedInputNames,
+            getModelData,
+            operationImportPath,
+            getBinaryType,
+            dependencyImports,
+            jsDocRenderConfig,
+            generateOperationRequestBodyJsDoc
+        });
+    }
+    return {requestBodyArgumentNames};
+}
+
 export function generateOperationMethods({
     paths,
     serviceName,
     getModelData,
     commonHttpClientImportName,
-        operationsConfig: {
+    operationsConfig: {
         generateOperationName,
         generateOperationJsDoc,
         generateOperationResultDescription,
@@ -109,7 +604,7 @@ export function generateOperationMethods({
         mediaTypeArgumentName,
         generateOperationParameterJsDoc,
         generateOperationRequestBodyJsDoc,
-                        responseBinaryType = 'blob'
+        responseBinaryType = 'blob'
     } = {},
     operationImportPath,
     binaryTypes,
@@ -119,7 +614,7 @@ export function generateOperationMethods({
     serviceName?: string;
     getModelData: GetModelData;
     commonHttpClientImportName: string;
-        operationsConfig?: OpenApiClientGeneratorConfig['operations'];
+    operationsConfig?: OpenApiClientGeneratorConfig['operations'];
     operationImportPath: string;
     binaryTypes: OpenApiClientCustomizableBinaryType[];
     jsDocRenderConfig: JsDocRenderConfig;
@@ -128,20 +623,8 @@ export function generateOperationMethods({
     const getBinaryType = () =>
         extendDependenciesAndGetResult(generateBinaryType(binaryTypes, operationImportPath), dependencyImports);
 
-    const methodProperties: import('../../emit').ClassProperty[] = [];
+    const methodProperties: ClassProperty[] = [];
     const deprecatedOperations: {[methodAndPath: string]: string} = {};
-
-    function getParameterErrorLocation(param: OpenApiParameter, path: string, httpMethod: string) {
-        return (
-            `${JSON.stringify(param.name)} at path ` +
-            `${JSON.stringify(path)}, method ${httpMethod.toUpperCase()}: unsupported style :` +
-            JSON.stringify(param.style)
-        );
-    }
-
-    function createIncompatibleParameterStyleError(param: OpenApiParameter, path: string, httpMethod: string) {
-        return new Error(`Could not process parameter ${getParameterErrorLocation(param, path, httpMethod)}`);
-    }
 
     for (const [path, pathItem] of Object.entries(paths)) {
         for (const httpMethod of openApiHttpMethods) {
@@ -175,109 +658,26 @@ export function generateOperationMethods({
             });
             const parameters = sortParameters(operation.parameters ?? []);
             const usedInputNames: Record<string, true> = {};
-            const inputParameters: {
-                [K in Exclude<OpenApiParameter['in'], 'cookie'> | 'body']: (
-                    | OpenApiParameterFromArgument
-                    | OpenApiParameterValue
-                )[];
-            } = {
-                path: [],
-                query: [],
-                header: [],
-                body: []
-            };
+            const inputParameters = createOperationInputParameters();
             for (const parameter of parameters) {
-                if (parameter.in === 'path') {
-                    if (parameter.style && parameter.style !== 'simple') {
-                        throw createIncompatibleParameterStyleError(parameter, path, httpMethod);
-                    }
-                    if (!parameter.required) {
-                        throw new Error(
-                            `Path parameters should be required: ${getParameterErrorLocation(parameter, path, httpMethod)}`
-                        );
-                    }
-                } else if (parameter.in === 'query') {
-                    if (parameter.style && parameter.style !== 'form') {
-                        throw createIncompatibleParameterStyleError(parameter, path, httpMethod);
-                    }
-                } else if (parameter.in === 'header') {
-                    if (parameter.style && parameter.style !== 'simple') {
-                        throw createIncompatibleParameterStyleError(parameter, path, httpMethod);
-                    }
-                } else if (parameter.in === 'cookie') {
-                    throw new Error(
-                        `Parameters in cookies are not supported: ${getParameterErrorLocation(parameter, path, httpMethod)}`
-                    );
-                } else {
-                    throw new Error(
-                        `Unknown parameter type ${parameter.in}: ${getParameterErrorLocation(parameter, path, httpMethod)}`
-                    );
-                }
-                const schema = parameter.schema ?? true;
-                if (typeof schema !== 'boolean' && schema.const !== undefined) {
-                    inputParameters[parameter.in].push({
-                        paramName: parameter.name,
-                        value: valueToAstExpression(schema.const)
-                    });
-                } else {
-                    const suggestedParameterName = generateUniqueName(
-                        parameter.name,
-                        [parameter.in, `${parameter.in} param`],
-                        usedInputNames
-                    );
-                    const parameterName = generateUniqueName(
-                        generateOperationParameterArgumentName
-                            ? generateOperationParameterArgumentName({
-                                  operation,
-                                  path,
-                                  serviceName,
-                                  parameter,
-                                  pathItem,
-                                  operationName,
-                                  suggestedName: suggestedParameterName,
-                                  httpMethod
-                              })
-                            : suggestedParameterName,
-                        [],
-                        usedInputNames
-                    );
-                    usedInputNames[parameterName] = true;
-                    const paramJsDoc = extractJsDoc(parameter);
-                    inputParameters[parameter.in].push({
-                        paramName: parameter.name,
-                        argumentName: parameterName,
-                        destructuringName: generateDestructuringName(
-                            parameterName,
-                            [parameter.in, `${parameter.in} param`],
-                            usedInputNames
-                        ),
-                        optional: !parameter.required,
-                        type: extendDependenciesAndGetResult(
-                            generateSchemaTypeAndImports({
-                                schema,
-                                sourceImportPath: operationImportPath,
-                                getModelData,
-                                getBinaryType
-                            }),
-                            dependencyImports
-                        ),
-                        docs: renderJsDoc(
-                            generateOperationParameterJsDoc
-                                ? generateOperationParameterJsDoc({
-                                      suggestedJsDoc: paramJsDoc,
-                                      operation,
-                                      operationName,
-                                      serviceName,
-                                      parameter,
-                                      pathItem,
-                                      path,
-                                      httpMethod
-                                  })
-                                : paramJsDoc,
-                            jsDocRenderConfig
-                        )
-                    });
-                }
+                addOperationParameterInput({
+                    inputParameters,
+                    parameter,
+                    operation,
+                    pathItem,
+                    path,
+                    serviceName,
+                    httpMethod,
+                    operationName,
+                    usedInputNames,
+                    getModelData,
+                    operationImportPath,
+                    getBinaryType,
+                    dependencyImports,
+                    jsDocRenderConfig,
+                    generateOperationParameterArgumentName,
+                    generateOperationParameterJsDoc
+                });
             }
             let jsdoc = extractJsDoc(operation);
             if (operationReturn.suggestedDescription || generateOperationResultDescription) {
@@ -315,187 +715,27 @@ export function generateOperationMethods({
             let argumentExtensionType: TSType | undefined;
             const requestBody = operation.requestBody;
             if (requestBody) {
-                inputParameters['body'] = [];
-                const mediaTypes = Object.entries(requestBody.content).sort(([a], [b]) => a.localeCompare(b));
-                if (mediaTypes.length > 1) {
-                    for (let i = 0; i < mediaTypes.length; i++) {
-                        if (isWildcardMediaType(mediaTypes[i][0])) {
-                            mediaTypes.splice(i, 1);
-                        }
-                    }
-                }
-                const mediaTypeName = generateUniqueName(mediaTypeArgumentName ?? 'mediaType', [], usedInputNames);
-                usedInputNames[mediaTypeName] = true;
-                const additionUnion = tsUnionType([]);
-                let defaultMediaType: string | undefined;
-                const mediaTypesWithRequestBodyNames: {
-                    mediaType: string;
-                    content: OpenApiMediaType;
-                    requestBodyName: string;
-                }[] = mediaTypes.map(([mediaType, content]) => {
-                    const requestBodySuggestedName = generateUniqueName(
-                        getUserFreiendlySchemaName(content.schema ?? true) ?? 'request body',
-                        [],
-                        usedInputNames
-                    );
-                    return {
-                        mediaType,
-                        content,
-                        requestBodyName: generateUniqueName(
-                            generateOperationRequestBodyArgumentName
-                                ? generateOperationRequestBodyArgumentName({
-                                      path,
-                                      pathItem,
-                                      operation,
-                                      operationName,
-                                      serviceName,
-                                      content,
-                                      requestBody,
-                                      mediaType,
-                                      suggestedName: requestBodySuggestedName,
-                                      httpMethod
-                                  })
-                                : requestBodySuggestedName,
-                            [],
-                            usedInputNames
-                        )
-                    };
+                const requestBodyInputs = addRequestBodyInputs({
+                    inputParameters,
+                    requestBody,
+                    operation,
+                    pathItem,
+                    path,
+                    serviceName,
+                    httpMethod,
+                    operationName,
+                    usedInputNames,
+                    getModelData,
+                    operationImportPath,
+                    getBinaryType,
+                    dependencyImports,
+                    jsDocRenderConfig,
+                    generateOperationRequestBodyArgumentName,
+                    mediaTypeArgumentName,
+                    generateOperationRequestBodyJsDoc
                 });
-
-                const allRequestBodyNames = uniq(
-                    mediaTypesWithRequestBodyNames.map(({requestBodyName}) => requestBodyName)
-                ).sort((a, b) => a.localeCompare(b));
-
-                requestBodyArgumentNames = allRequestBodyNames;
-
-                if (mediaTypesWithRequestBodyNames.length > 1) {
-                    for (const {mediaType, content, requestBodyName} of mediaTypesWithRequestBodyNames) {
-                        const schema = content.schema ?? true;
-                        let isDefaultType = false;
-                        if (!defaultMediaType && isJsonMediaType(mediaType)) {
-                            isDefaultType = true;
-                            defaultMediaType = mediaType;
-                        }
-                        const mediaTypeArgumentType = isWildcardMediaType(mediaType)
-                            ? tsStringKeyword()
-                            : tsLiteralType(stringLiteral(mediaType));
-                        const mediaTypePropertySignature = tsPropertySignature(
-                            identifier(mediaTypeName),
-                            tsTypeAnnotation(mediaTypeArgumentType),
-                            isDefaultType
-                        );
-                        const jsdoc = extractJsDoc({...requestBody, ...content});
-                        additionUnion.types.push(
-                            tsTypeLiteral([
-                                mediaTypePropertySignature,
-                                ...allRequestBodyNames.map((requestBodyNameItem) => {
-                                    const isCurrentRequestBody = requestBodyNameItem === requestBodyName;
-                                    const property = attachJsDocComment(
-                                        tsPropertySignature(
-                                            identifier(requestBodyName),
-                                            tsTypeAnnotation(
-                                                isCurrentRequestBody
-                                                    ? extendDependenciesAndGetResult(
-                                                          generateSchemaTypeAndImports({
-                                                              schema,
-                                                              sourceImportPath: operationImportPath,
-                                                              getModelData,
-                                                              getBinaryType
-                                                          }),
-                                                          dependencyImports
-                                                      )
-                                                    : tsUndefinedKeyword()
-                                            )
-                                        ),
-                                        renderJsDoc(
-                                            generateOperationRequestBodyJsDoc
-                                                ? generateOperationRequestBodyJsDoc({
-                                                      suggestedJsDoc: jsdoc,
-                                                      serviceName,
-                                                      operation,
-                                                      pathItem,
-                                                      operationName,
-                                                      content,
-                                                      requestBody,
-                                                      path,
-                                                      mediaType,
-                                                      httpMethod
-                                                  })
-                                                : jsdoc,
-                                            jsDocRenderConfig
-                                        )
-                                    );
-                                    return tsPropertySignature(property.name, tsTypeAnnotation(property.type!), !isCurrentRequestBody);
-                                })
-                            ])
-                        );
-                    }
-                    inputParameters['header'].push({
-                        paramName: 'Content-Type',
-                        argumentName: mediaTypeName,
-                        destructuringName: generateDestructuringName(mediaTypeName, [], usedInputNames),
-                        docs: null,
-                        defaultValue: defaultMediaType ? stringLiteral(defaultMediaType) : undefined
-                    });
-                    for (const requestBodyName of allRequestBodyNames) {
-                        inputParameters['body'].push({
-                            argumentName: requestBodyName,
-                            destructuringName: generateDestructuringName(requestBodyName, [], usedInputNames),
-                            paramName: requestBodyName,
-                            docs: null
-                        });
-                    }
-                    argumentExtensionType = additionUnion;
-                } else if (mediaTypesWithRequestBodyNames.length === 1) {
-                    const [{mediaType, content, requestBodyName}] = mediaTypesWithRequestBodyNames;
-                    const schema = content.schema ?? true;
-                    const jsdoc = extractJsDoc({...requestBody, ...content});
-                    if (mediaType.includes('*')) {
-                        inputParameters['header'].push({
-                            paramName: 'Content-Type',
-                            argumentName: mediaTypeName,
-                            destructuringName: generateDestructuringName(mediaTypeName, [], usedInputNames),
-                            docs: null,
-                            type: tsStringKeyword()
-                        });
-                    } else {
-                        inputParameters['header'].push({
-                            paramName: 'Content-Type',
-                            value: stringLiteral(mediaType)
-                        });
-                    }
-                    inputParameters['body'].push({
-                        paramName: requestBodyName,
-                        argumentName: requestBodyName,
-                        destructuringName: generateDestructuringName(requestBodyName, [], usedInputNames),
-                        type: extendDependenciesAndGetResult(
-                            generateSchemaTypeAndImports({
-                                schema,
-                                sourceImportPath: operationImportPath,
-                                getModelData,
-                                getBinaryType
-                            }),
-                            dependencyImports
-                        ),
-                        docs: renderJsDoc(
-                            generateOperationRequestBodyJsDoc
-                                ? generateOperationRequestBodyJsDoc({
-                                      suggestedJsDoc: jsdoc,
-                                      serviceName,
-                                      operation,
-                                      pathItem,
-                                      operationName,
-                                      content,
-                                      requestBody,
-                                      path,
-                                      mediaType,
-                                      httpMethod
-                                  })
-                                : jsdoc,
-                            jsDocRenderConfig
-                        )
-                    });
-                }
+                requestBodyArgumentNames = requestBodyInputs.requestBodyArgumentNames;
+                argumentExtensionType = requestBodyInputs.argumentExtensionType;
             }
 
             if (inputParameters['path'].length > 0) {
@@ -628,7 +868,7 @@ export function generateOperationMethods({
             methodProperties.push(attachJsDocComment(operationMethodProperty, renderJsDoc(jsdoc, jsDocRenderConfig)));
         }
     }
-    methodProperties.sort((a, b) => (a.name as import('../../emit').Identifier).text.localeCompare((b.name as import('../../emit').Identifier).text));
+    methodProperties.sort((a, b) => (a.name as Identifier).text.localeCompare((b.name as Identifier).text));
 
     return {methods: methodProperties, dependencyImports, deprecatedOperations};
 }

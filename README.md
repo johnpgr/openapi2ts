@@ -67,7 +67,7 @@ Relative imports in `src/` use explicit `.ts` extensions (Node native ESM). Afte
 | `main` | `./src/index.ts` |
 | `bin` | `openapi2ts` → `./src/cli/index.ts` |
 
-Dev-only tooling (`typescript` for `tsc --noEmit`, `scripts/*.mjs`) does not ship to consumers.
+Dev-only tooling (`typescript` for `tsc --noEmit` ) does not ship to consumers.
 
 ### Programmatic exports
 
@@ -255,19 +255,10 @@ openapi2ts/
       common/
         core/            # HTTP client templates
     utils/
-  scripts/               # repo maintenance (snapshots, import patching)
   test/
     fixtures/petstore.json
     snapshots/petstore/  # golden output
 ```
-
-### `scripts/` (maintenance only)
-
-| Script | Purpose |
-|--------|---------|
-| `generate-snapshots.mjs` | Refresh goldens via local mdevils/api-typescript-generator checkout |
-| `patch-import-extensions.mjs` | Add `.ts` to relative imports (`npm run patch-imports`) |
-| `fix-type-imports.mjs` | Split value / `import type` imports (migration helper) |
 
 ---
 
