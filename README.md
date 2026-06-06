@@ -89,10 +89,43 @@ export async function openapiToTypescriptClient(params: {
 ## CLI
 
 ```
-openapi2ts generate <config>
-openapi2ts check <config>
--h, --help
+openapi2ts generate [config]
+openapi2ts check [config]
+openapi2ts generate --url <url> --out <dir>
+openapi2ts generate --file <path> --out <dir>
+openapi2ts check --url <url> --out <dir>
+openapi2ts check --file <path> --out <dir>
+
+Options:
+  --url <url>        OpenAPI JSON document URL (quick mode)
+  --file <path>      OpenAPI JSON document file (quick mode)
+  --out, -o <dir>    Output directory (required in quick mode)
+  --name <name>      Client class name (quick mode, default: ApiClient)
+  --base-url <url>   Generated client base URL (quick mode)
+  -h, --help         Show help
 ```
+
+When `[config]` is omitted, the CLI looks in the **current working directory** for:
+
+`openapi2ts.config.ts` → `.mts` → `.cts` → `.mjs` → `.cjs` → `.js`
+
+### Config file (full options)
+
+```bash
+openapi2ts generate openapi2ts.config.ts
+openapi2ts check openapi2ts.config.ts
+openapi2ts generate    # auto-discovers openapi2ts.config.*
+```
+
+### Quick one-off (narrow defaults)
+
+```bash
+openapi2ts generate --file ./openapi/schema.json --out ./src/api
+openapi2ts generate --url http://127.0.0.1:8000/api/schema/?format=json -o ./src/api
+openapi2ts generate --file ./openapi/schema.json --out ./src/api --name MyApiClient --base-url /api
+```
+
+Quick mode uses `ApiClient` as the default class name and does not expose cleanup, layout, JSDoc hooks, or document patches — use a config file for those.
 
 | Exit code | Condition |
 |-----------|-----------|

@@ -2,6 +2,7 @@
 import * as fs from 'fs';
 import path from 'path';
 import {pathToFileURL} from 'url';
+import {buildQuickConfig, CLI_USAGE, discoverConfigFile, parseCliArgs} from './args.ts';
 import {compareGenerationResult} from './compare-generation-result.ts';
 import {saveGenerationResult} from './save-generation-result.ts';
 import {defaultCoreRelativeDirPath} from '../schema-to-typescript/common/client-core.ts';
@@ -12,16 +13,8 @@ import { openapiToTypescriptClient } from '../schema-to-typescript/openapi-to-ty
 import type { OpenApiClientGeneratorConfig } from '../schema-to-typescript/openapi-to-typescript-client.ts';
 import {loadOpenApiDocument} from '../schemas/load-open-api-document.ts';
 
-const USAGE = `Usage:
-  openapi2ts generate <config>
-  openapi2ts check <config>
-
-Options:
-  -h, --help  Show help
-`;
-
 function printHelp(): void {
-    process.stdout.write(USAGE);
+    process.stdout.write(CLI_USAGE);
 }
 
 async function loadConfigModule(fullFilename: string): Promise<Record<string, unknown>> {
@@ -65,37 +58,34 @@ function getCleanupDirectories(generateConfig: OpenApiClientGeneratorConfig & Co
     ];
 }
 
-function parseArgs(argv: string[]) {
-    if (argv.includes('-h') || argv.includes('--help')) {
-        return {help: true as const};
+async function resolveConfig(parsed: Extract<ReturnType<typeof parseCliArgs>, {kind: 'success'}>): Promise<Openapi2tsConfig> {
+    if (parsed.mode === 'quick') {
+        return buildQuickConfig(parsed.quick);
     }
-    const [command, config, ...rest] = argv;
-    if (!command || rest.length > 0 || (command !== 'generate' && command !== 'check')) {
-        return {error: true as const};
+    const configPath =
+        parsed.mode === 'config' ? parsed.configPath : discoverConfigFile(process.cwd());
+    if (!configPath) {
+        throw new Error(
+            'No configuration file found in the current working directory.\n' +
+                'Create openapi2ts.config.ts or pass a config path, or use --url/--file with --out.'
+        );
     }
-    if (!config) {
-        return {error: true as const, missingConfig: true};
-    }
-    return {command: command as 'generate' | 'check', config};
+    return loadConfig(configPath);
 }
 
 async function main() {
-    const parsed = parseArgs(process.argv.slice(2));
-    if ('help' in parsed) {
+    const parsed = parseCliArgs(process.argv.slice(2));
+    if (parsed.kind === 'help') {
         printHelp();
         return;
     }
-    if ('error' in parsed) {
-        if ('missingConfig' in parsed) {
-            process.stderr.write('Missing configuration file argument.\n\n');
-        } else {
-            process.stderr.write('Unknown command. Valid commands: generate, check.\n\n');
-        }
+    if (parsed.kind === 'error') {
+        process.stderr.write(`${parsed.message}\n\n`);
         printHelp();
         process.exit(1);
     }
 
-    const config: Openapi2tsConfig = await loadConfig(parsed.config);
+    const config: Openapi2tsConfig = await resolveConfig(parsed);
     for (const generateConfig of config.generates) {
         if (generateConfig.type !== 'openapiClient') {
             continue;
