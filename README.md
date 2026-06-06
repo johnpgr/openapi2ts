@@ -1,10 +1,10 @@
 # openapi2ts
 
-Zero-runtime-dependency OpenAPI → TypeScript client generator for **Node 24+**.
+OpenAPI → TypeScript client generator for **Node 24+**.
 
-Inspired by [mdevils/api-typescript-generator](https://github.com/mdevils/api-typescript-generator). This package ships **raw TypeScript** in `src/` — no build step, no compiled `lib/`.
+Inspired by [mdevils/api-typescript-generator](https://github.com/mdevils/api-typescript-generator). This package ships raw TypeScript in `src/` and exposes a small `cli.js` bin wrapper that runs it through `ts-blank-space/register`, because Node does not strip types for packages under `node_modules`.
 
-- **Published `dependencies`:** none
+- **Published dependency:** `ts-blank-space` (CLI type-stripping loader)
 - **Peer dependency:** `typescript >= 6.0.0` (codegen via `ts.factory` / `ts.createPrinter`)
 - **OpenAPI input:** JSON only (OpenAPI 3.0 / 3.1)
 - **Runtime:** Node 24+ with native [type stripping](https://nodejs.org/api/typescript.html)
@@ -51,9 +51,9 @@ npm run typecheck     # tsc --noEmit
 npm test
 ```
 
-When installed, npm links the `openapi2ts` binary to `src/cli/index.ts`.
+When installed, npm links the `openapi2ts` binary to `cli.js`.
 
-Relative imports in `src/` use explicit `.ts` extensions (Node native ESM). After adding modules, run `npm run patch-imports`.
+The `cli.js` wrapper imports `src/cli/index.ts` with `node --import ts-blank-space/register`, so consumers can run `npx openapi2ts` without knowing about the loader.
 
 ---
 
@@ -84,9 +84,11 @@ Then install from your app root:
 npm install
 ```
 
-`openapi2ts` is a **peer dependency** — your app must install `typescript` (>= 6). The consumer also needs **Node 24+** (native type stripping for the shipped `.ts` sources and CLI).
+`openapi2ts` is a **peer dependency** — your app must install `typescript` (>= 6). The consumer also needs **Node 24+**.
 
-npm links the `openapi2ts` binary to `src/cli/index.ts` inside the installed git package, so `npx openapi2ts` and the scripts above work like a normal package.
+npm links the `openapi2ts` binary to `cli.js` inside the installed git package. The wrapper loads `ts-blank-space/register` and then imports `src/cli/index.ts`, so `npx openapi2ts` and the scripts above work like a normal package even from `node_modules`.
+
+There is no postinstall build step and no generated JavaScript output.
 
 If you need to pin an exact release instead of a semver range:
 
@@ -138,7 +140,7 @@ import { openapiToTypescriptClient } from "openapi2ts/openapi-client"
 import type { OpenApiDocument } from "openapi2ts/openapi"
 ```
 
-Types and runtime entry points resolve to the package's raw `src/*.ts` files via `package.json` `exports`.
+Type and package entry points resolve to raw `src/*.ts` files. The CLI entry is `cli.js`; programmatic runtime imports from `node_modules` need their own TypeScript loader.
 
 ### 3. Updating the generator
 
@@ -235,12 +237,12 @@ The `package.json` version and tag should match. Consumer installs like `github:
 
 ## Goals
 
-- Zero published dependencies — runtime uses Node built-ins plus the peer `typescript` install
-- TypeScript peer only
+- One published dependency: `ts-blank-space` for the CLI loader
+- TypeScript peer only for codegen
 - Node 24+ with native type stripping (prefer **>= 24.12.0**)
 - JSON OpenAPI 3.0 / 3.1 via `JSON.parse` only
 - Tag-grouped service classes and `client.tag.operation()` accessors
-- Ship raw `.ts` source (monorepo / direct checkout usage; no compile step in this repo)
+- Ship raw `.ts` source with a loader-backed CLI wrapper
 
 ## Non-goals
 
@@ -254,11 +256,12 @@ The `package.json` version and tag should match. Consumer installs like `github:
 
 | Field | Value |
 |-------|-------|
-| `dependencies` | `{}` |
+| `dependencies` | `{ "ts-blank-space": "^0.9.0" }` |
 | `peerDependencies.typescript` | `>=6.0.0` |
 | `engines.node` | `>=24.0.0` (prefer `>=24.12.0`) |
+| `types` | `./src/index.ts` |
 | `main` | `./src/index.ts` |
-| `bin` | `openapi2ts` → `./src/cli/index.ts` |
+| `bin` | `openapi2ts` → `./cli.js` |
 
 Dev-only tooling (`typescript` for `tsc --noEmit` ) does not ship to consumers.
 
@@ -459,7 +462,7 @@ openapi2ts/
 
 | Area | How |
 |------|-----|
-| Package contract | `npm test` — zero deps, raw TS entry, no forbidden imports in `src/` |
+| Package contract | `npm test` — loader-backed bin, raw TS package entries, no forbidden imports in `src/` |
 | Snapshot parity | `node src/cli/index.ts check test/snapshot-config.ts` |
 | Types | `npm run typecheck` |
 | JSON-only input | YAML / YAML-in-`.json` must fail with clear error |

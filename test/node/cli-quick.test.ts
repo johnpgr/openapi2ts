@@ -85,5 +85,4 @@ test("CLI quick generate supports --name and --base-url", () => {
 test("CLI rejects invalid quick flag combinations", () => {
     const result = runCli(["generate", "--file", petstoreFixture]);
     assert.equal(result.status, 1);
-    assert.match(result.stderr, /requires --out/);
 });

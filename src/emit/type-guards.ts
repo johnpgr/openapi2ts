@@ -10,11 +10,11 @@ export function isBooleanLiteral(node: ts.Node): node is ts.BooleanLiteral {
     return node.kind === ts.SyntaxKind.TrueKeyword || node.kind === ts.SyntaxKind.FalseKeyword;
 }
 
-export const isTSUnionType = (node: CompatType): node is ts.UnionTypeNode | import('./compat').MutableUnionType =>
+export const isTSUnionType = (node: CompatType): node is ts.UnionTypeNode | import('./compat.ts').MutableUnionType =>
     isMutableUnionType(node) || node.kind === ts.SyntaxKind.UnionType;
-export const isTSIntersectionType = (node: CompatType): node is ts.IntersectionTypeNode | import('./compat').MutableIntersectionType =>
+export const isTSIntersectionType = (node: CompatType): node is ts.IntersectionTypeNode | import('./compat.ts').MutableIntersectionType =>
     isMutableIntersectionType(node) || node.kind === ts.SyntaxKind.IntersectionType;
-export const isTSTypeLiteral = (node: CompatType): node is ts.TypeLiteralNode | import('./compat').MutableTypeLiteral =>
+export const isTSTypeLiteral = (node: CompatType): node is ts.TypeLiteralNode | import('./compat.ts').MutableTypeLiteral =>
     isMutableTypeLiteral(node) || node.kind === ts.SyntaxKind.TypeLiteral;
 export const isTSPropertySignature = (node: ts.TypeElement): node is ts.PropertySignature =>
     node.kind === ts.SyntaxKind.PropertySignature;

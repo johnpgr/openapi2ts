@@ -82,7 +82,8 @@ async function main() {
     if (parsed.kind === 'error') {
         process.stderr.write(`${parsed.message}\n\n`);
         printHelp();
-        process.exit(1);
+        process.exitCode = 1;
+        return;
     }
 
     const config: Openapi2tsConfig = await resolveConfig(parsed);
@@ -116,7 +117,8 @@ async function main() {
                 process.stderr.write(
                     'Generated files are not up to date. Please run "openapi2ts generate" to update them.\n'
                 );
-                process.exit(1);
+                process.exitCode = 1;
+                return;
             }
         }
     }
@@ -124,5 +126,5 @@ async function main() {
 
 main().catch((e) => {
     process.stderr.write(`${e instanceof Error ? e.message : e}\n`);
-    process.exit(1);
+    process.exitCode = 1;
 });

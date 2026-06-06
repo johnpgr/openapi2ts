@@ -499,15 +499,15 @@ export function tsRestType(type: CompatType): ts.RestTypeNode {
     return ts.factory.createRestTypeNode(finalizeType(type));
 }
 
-export function tsIntersectionType(types: readonly CompatType[] = []): import('./compat').MutableIntersectionType {
+export function tsIntersectionType(types: readonly CompatType[] = []): import('./compat.ts').MutableIntersectionType {
     return {kind: 'IntersectionType', types: types.map(finalizeType)};
 }
 
-export function tsUnionType(types: readonly CompatType[] = []): import('./compat').MutableUnionType {
+export function tsUnionType(types: readonly CompatType[] = []): import('./compat.ts').MutableUnionType {
     return {kind: 'UnionType', types: types.map(finalizeType)};
 }
 
-export function tsTypeLiteral(members: readonly ts.TypeElement[] = []): import('./compat').MutableTypeLiteral {
+export function tsTypeLiteral(members: readonly ts.TypeElement[] = []): import('./compat.ts').MutableTypeLiteral {
     return {kind: 'TypeLiteral', members: [...members]};
 }
 
@@ -641,7 +641,7 @@ export type ImportDeclaration = ts.ImportDeclaration;
 export type ExportNamedDeclaration = ts.Statement;
 export type ClassProperty = ts.PropertyDeclaration;
 export type ClassMethod = ts.MethodDeclaration | ts.ConstructorDeclaration;
-export type TSUnionType = ts.UnionTypeNode | import('./compat').MutableUnionType;
-export type TSIntersectionType = ts.IntersectionTypeNode | import('./compat').MutableIntersectionType;
-export type TSTypeLiteral = ts.TypeLiteralNode | import('./compat').MutableTypeLiteral;
+export type TSUnionType = ts.UnionTypeNode | import('./compat.ts').MutableUnionType;
+export type TSIntersectionType = ts.IntersectionTypeNode | import('./compat.ts').MutableIntersectionType;
+export type TSTypeLiteral = ts.TypeLiteralNode | import('./compat.ts').MutableTypeLiteral;
 export type TSPropertySignature = ts.PropertySignature;

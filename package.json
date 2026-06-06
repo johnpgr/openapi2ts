@@ -1,16 +1,16 @@
 {
     "name": "openapi2ts",
-    "version": "1.0.0",
-    "description": "OpenAPI to TypeScript client generator. Only the TypeScript compiler is required as a dependency (peer). Node 24+, JSON only. Ships raw TypeScript",
+    "version": "1.0.1",
+    "description": "OpenAPI to TypeScript client generator. Only the TypeScript compiler is required as a peer. Node 24+, JSON only. Ships raw TypeScript.",
     "license": "MIT",
+    "types": "./src/index.ts",
     "bin": {
-        "openapi2ts": "./src/cli/index.ts"
+        "openapi2ts": "./cli.js"
     },
     "files": [
+        "cli.js",
         "src",
-        "index.d.ts",
-        "openapi.d.ts",
-        "openapi-client.d.ts",
+        "tsconfig.json",
         "LICENSE",
         "README.md"
     ],
@@ -38,7 +38,9 @@
         "test:update": "node src/cli/index.ts generate test/snapshot-config.ts",
         "typecheck": "tsc --noEmit"
     },
-    "dependencies": {},
+    "dependencies": {
+        "ts-blank-space": "^0.9.0"
+    },
     "devDependencies": {
         "@types/node": "^24.0.0",
         "typescript": "^6.0.0"
